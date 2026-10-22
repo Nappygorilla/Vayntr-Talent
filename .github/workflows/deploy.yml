@@ -31,6 +31,21 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      # Release gates: a build that compiles is not proof the app behaves.
+      - name: Lint
+        run: npm run lint
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+        env:
+          CI: 'true'
+
       - name: Build production site
         run: npm run build
         env:

@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Check, CircleAlert, Plus, Search, ShieldCheck, UserRound } from 'lucide-react'
-import { PrivacyPage, SignInPage, SignUpPage, deleteAccount, endSession, restoreSession, roleLabels, updateAccount, type Account } from './auth'
+import { PrivacyPage, SignInPage, SignUpPage, deleteAccount, emptyProfile, endSession, guardianHoldReason, restoreSession, roleLabels, updateAccount, type Account, type Profile } from './auth'
 import { useMagneticButtons } from './magnetic'
+import { agePolicyFor, gameAgePolicies } from './age-policy'
+import { formatWhen, listApplications, listFeedback, listReports, recordFeedback, recordReport, saveApplication, setApplicationStatus, type FeedbackRecord, type ReportRecord } from './activity'
 type Listing = {
   id: string; title: string; org: string; mark: string; category: string; game: string; openings: number
   engagement: string; salary: string; payTerms: string; hours: string; schedule: string; location: string; eligibility: string
@@ -23,32 +25,7 @@ type Organization = { name: string; mark: string; location: string; focus: strin
 const orgs: Organization[] = []
 const players: Player[] = []
 const listings: Listing[] = []
-type AgePolicy = { game: string; minAge: number; note: string; source: string }
-// Minimum ages come from each scene's competition rules, not from a platform-wide number.
-// Guardian consent is required for every minor; organisation contracts for a minor also need a guardian's signature.
-const gameAgePolicies: AgePolicy[] = [
-  { game: 'Rocket League', minAge: 13, note: 'RLCS lowered its minimum to 13 in 2024, so a 14-year-old can sign with an org. A guardian must consent and accompany them at in-person events.', source: 'https://www.rocketleague.com/competitive/rules' },
-  { game: 'Fortnite', minAge: 13, note: 'FNCS rules set 13+, with parent or guardian permission to compete.', source: 'https://www.fortnite.com/competitive/rules-guidelines/rules-library/fortnite-championship-series-fncs-2026-official-rules' },
-  { game: 'Street Fighter 6', minAge: 13, note: 'Capcom Pro Tour requires 13+ and the local game rating, with guardian consent and accompaniment.', source: 'https://sf.esports.capcom.com/cpt/2025/rules/' },
-  { game: 'Apex Legends', minAge: 16, note: 'ALGS requires 16+ (17 in Japan, 18 in South Korea) and guardian consent for minors.', source: 'https://algs.ea.com/year-6-rules.pdf' },
-  { game: 'Counter-Strike 2', minAge: 16, note: 'ESL Pro League qualifiers list 16+; Valve leaves the Major age floor to event organisers.', source: 'https://pro.eslgaming.com/tour/2025/02/2025-rulebook-update-2/' },
-  { game: 'EA SPORTS FC', minAge: 16, note: 'FC Pro uses 16+ (17 in Japan; 18 in Ghana, Kenya, Nigeria and South Korea).', source: 'https://www.ea.com/games/ea-sports-fc/fc-pro/ea-sports-fc-pro-26-official-rules' },
-  { game: 'League of Legends', minAge: 17, note: 'LCS/LTA competition is 17+; the LEC requires players to have lived 18 years to play a match.', source: 'https://competitiveops.riotgames.com/library?GAME=lol' },
-  { game: 'Overwatch 2', minAge: 17, note: 'OWCS requires players to be 17 by the first day of each tournament.', source: 'https://esports.overwatch.com/faq' },
-  { game: 'VALORANT', minAge: 18, note: 'VCT Tier 1 is 18+. Challengers and regional qualifiers can set their own rules.', source: 'https://competitiveops.riotgames.com/library?GAME=val' },
-  { game: 'Call of Duty / Warzone', minAge: 18, note: 'CDL Challengers and the World Series of Warzone are 18+.', source: 'https://callofdutyleague.com/en-us/challengers/how-to-compete' },
-  { game: 'Rainbow Six Siege', minAge: 18, note: 'BLAST R6 requires players and team staff to be 18+ at their first match.', source: 'https://www.ubisoft.com/en-us/esports/rainbow-six' },
-  { game: 'Tekken 8', minAge: 18, note: 'Tekken World Tour requires the local age of majority or explicit guardian permission.', source: 'https://www.bandainamcoent.com/legal/community-events/official-rules-twt' },
-]
-const defaultAgePolicy: AgePolicy = {
-  game: 'Content & production roles',
-  minAge: 16,
-  note: 'Non-competition roles use the platform minimum of 16. A guardian must consent for anyone under 18.',
-  source: '',
-}
-function agePolicyFor(game: string) {
-  return gameAgePolicies.find((policy) => policy.game === game) ?? defaultAgePolicy
-}
+// Age floors live in their own pure module so they can be tested directly.
 
 function lastMessage(conversation: Conversation) {
   return conversation.messages[conversation.messages.length - 1]
@@ -67,7 +44,6 @@ const commandActions = [
   { page: 'Log in', label: 'Log in', description: 'Sign in to your account on this device', keywords: 'login signin account session password', icon: '→' },
   { page: 'Sign up', label: 'Create a free account', description: 'Join as a player, creator, or organization', keywords: 'register signup join free account membership', icon: '✳' },
   { page: 'Privacy', label: 'Privacy notice', description: 'Your data, rights, and US state privacy law', keywords: 'ccpa cpra coppa privacy data rights', icon: '◇' },
-  { page: 'Moderation', label: 'Moderator dashboard', description: 'Review reports and cases', keywords: 'staff reports cases', icon: '▦' },
 ]
 
 function App() {
@@ -83,6 +59,9 @@ function App() {
   const [profileName, setProfileName] = useState('')
   const [age, setAge] = useState<number | null>(null)
   const [visible, setVisible] = useState(false)
+  const [profileFields, setProfileFields] = useState<Profile>(emptyProfile)
+  const [reports, setReports] = useState<ReportRecord[]>([])
+  const [feedbackLog, setFeedbackLog] = useState<FeedbackRecord[]>([])
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeThread, setActiveThread] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<string[]>([])
@@ -93,9 +72,14 @@ function App() {
   const [commandQuery, setCommandQuery] = useState('')
   const [commandSelection, setCommandSelection] = useState(0)
   const categories = ['All roles', ...new Set(listings.map((item) => item.category))]
+  // A minor's guardian has not confirmed, so contact, applications and discovery stay shut.
+  const guardianHold = guardianHoldReason(account)
   useEffect(() => {
     const restored = restoreSession()
     if (restored) applySession(restored)
+    setApplications(listApplications().map((entry) => ({ listingId: entry.listingId, status: entry.status, shared: entry.shared })))
+    setReports(listReports())
+    setFeedbackLog(listFeedback())
   }, [])
   useEffect(() => {
     const navigate = (event: Event) => { const next = (event as CustomEvent<string>).detail; setPage(next); setSelected(null); setMobileMenu(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }
@@ -125,21 +109,32 @@ function App() {
   }, [commandQuery])
   function go(next: string) { if (next === 'Sign up') setSignupKey((value) => value + 1); setPage(next); setSelected(null); setMobileMenu(false); setCommandOpen(false); setCommandQuery(''); setCommandSelection(0); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   function apply(item: Listing, shared: string[]) {
-    if (!applications.some((application) => application.listingId === item.id)) setApplications([...applications, { listingId: item.id, status: 'Received', shared }])
-    setNotice(`Application saved on this device for ${item.title}.`)
+    if (guardianHold) return showNotice(guardianHold)
+    if (applications.some((application) => application.listingId === item.id)) return showNotice('You have already applied to this role.')
+    const stored = saveApplication({ listingId: item.id, status: 'Received', shared })
+    if (!stored) return showNotice('The application could not be saved: this browser is blocking storage. Nothing was recorded.')
+    setApplications([...applications, { listingId: stored.listingId, status: stored.status, shared: stored.shared }])
+    setNotice(`Application saved on this device for ${item.title}. Organizations cannot receive it until the API is connected.`)
   }
-  function updateStatus(id: string, status: string) { setApplications(applications.map((app) => app.listingId === id ? { ...app, status } : app)) }
+  function updateStatus(id: string, status: string) {
+    if (!setApplicationStatus(id, status)) return showNotice('The status change could not be saved on this device.')
+    setApplications(applications.map((app) => app.listingId === id ? { ...app, status } : app))
+  }
   function showNotice(text: string) { setNotice(text); window.setTimeout(() => setNotice(''), 5000) }
   function applySession(next: Account) {
     setAccount(next)
     setProfileName(next.name)
+    setProfileFields(next.profile)
+    setVisible(next.candidateVisible)
     if (next.role !== 'organization') setAge(next.age)
   }
   function logOut() {
     endSession()
     setAccount(null)
     setProfileName('')
+    setProfileFields(emptyProfile)
     setAge(null)
+    setVisible(false)
     showNotice('Logged out. Your account is still on this device.')
   }
   function removeAccount() {
@@ -147,6 +142,7 @@ function App() {
     deleteAccount(account.id)
     setAccount(null)
     setProfileName('')
+    setProfileFields(emptyProfile)
     setAge(null)
     setVisible(false)
     showNotice('Account deleted from this device.')
@@ -156,8 +152,8 @@ function App() {
     if (!account) return showNotice('Create a free account to export account data.')
     const payload = {
       exportedAt: new Date().toISOString(),
-      account,
-      profile: { displayName: profileName, age, candidateDiscovery: visible },
+      account: { ...account, profile: profileFields, candidateVisible: visible && !guardianHold },
+      profile: { displayName: profileName, age, ...profileFields, candidateDiscovery: visible && !guardianHold },
     }
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
     const link = document.createElement('a')
@@ -169,11 +165,17 @@ function App() {
   }
   function saveProfile() {
     if (!account) {
-      showNotice('Profile saved in this tab. Create a free account to keep it.')
+      showNotice('Profile saved in this tab. This device has no account, so the fields reset on reload.')
       return
     }
-    const stored = updateAccount(account.id, age === null ? { name: profileName } : { name: profileName, age })
-    if (stored) applySession({ ...account, name: stored.name, age: stored.age })
+    const stored = updateAccount(account.id, {
+      name: profileName.trim() || account.name,
+      ...(age === null ? {} : { age }),
+      profile: profileFields,
+      candidateVisible: guardianHold ? false : visible,
+    })
+    if (!stored) return showNotice('The profile could not be saved on this device.')
+    applySession(stored)
     showNotice('Profile saved to your account on this device.')
   }
   function ensureConversation(input: Omit<Conversation, 'id' | 'messages'> & { opener: string; from: 'org' | 'player' }) {
@@ -187,6 +189,7 @@ function App() {
     setConversations((current) => current.map((conversation) => conversation.id === id ? { ...conversation, messages: [...conversation.messages, { id: `${id}-${conversation.messages.length + 1}`, from, body, at: 'Just now' }] } : conversation))
   }
   function contactOrg(item: Listing) {
+    if (guardianHold) return showNotice(guardianHold)
     const id = ensureConversation({ org: item.org, orgMark: item.mark, playerId: 'me', playerName: profileName || 'You', playerMark: (profileName || 'Y').slice(0, 1).toUpperCase(), subject: item.title, opener: `Hi ${item.org}, I am interested in the ${item.title} role. Could we talk through the process and the terms?`, from: 'player' })
     setActiveThread(id)
     go('Messages')
@@ -205,6 +208,7 @@ function App() {
       <button className="command-trigger" type="button" aria-label="Open quick navigation (Ctrl or Command plus K)" aria-keyshortcuts="Control+K Meta+K" onClick={() => { setCommandQuery(''); setCommandSelection(0); setCommandOpen(true) }}><span className="command-trigger-icon" aria-hidden="true">⌕</span><span className="command-trigger-label">Quick jump</span><kbd>Ctrl K</kbd></button>
       <div className="header-actions">{account ? <button className="inbox-link" onClick={() => go('Messages')}>Inbox{awaitingReply > 0 && <span className="inbox-badge">{awaitingReply}</span>}</button> : null}{account ? <><button className="account-chip" onClick={() => go('My profile')} aria-label={`Signed in as ${account.name}. Open your profile`}><span className="account-chip-mark" aria-hidden="true">{account.name.slice(0, 1).toUpperCase()}</span><span className="account-chip-copy"><strong>{account.name}</strong><small>{roleLabels[account.role]}</small></span></button><button className="signout-link" onClick={logOut}>Log out</button></> : <><button className="signin" onClick={() => go('Log in')}>Log in</button><button className="button button-red button-small" onClick={() => go('Sign up')}>Join free</button></>}<button className="button button-outline button-small header-secondary" onClick={() => go('Marketplace')}>Explore roles <span className="button-arrow" aria-hidden="true">↗</span></button></div>
     </header>
+    {guardianHold && <div className="guardian-banner"><strong>Guardian confirmation pending.</strong><span>{guardianHold}</span><button type="button" className="text-link" onClick={() => go('Privacy')}>What this means</button></div>}
     {notice && <div className="notice" role="status"><span>{notice}</span><button aria-label="Dismiss message" onClick={() => setNotice('')}>×</button></div>}
     {commandOpen && <div className="command-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCommandOpen(false) }}><section className="command-palette" role="dialog" aria-modal="true" aria-labelledby="command-title"><h2 id="command-title" className="sr-only">Quick navigation</h2><div className="command-search-row"><span className="command-search-icon" aria-hidden="true">⌕</span><input autoFocus aria-label="Search pages and actions" role="combobox" aria-controls="quick-nav-results" aria-expanded="true" value={commandQuery} onChange={(event) => { setCommandQuery(event.target.value); setCommandSelection(0) }} onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setCommandSelection((current) => matchingCommands.length ? (current + 1) % matchingCommands.length : 0) } else if (event.key === 'ArrowUp') { event.preventDefault(); setCommandSelection((current) => matchingCommands.length ? (current - 1 + matchingCommands.length) % matchingCommands.length : 0) } else if (event.key === 'Enter') { event.preventDefault(); const action = matchingCommands[commandSelection]; if (action) go(action.page) } }} placeholder="Jump to a page or workspace…" /><kbd className="command-escape">ESC</kbd></div><div id="quick-nav-results" className="command-results" role="listbox" aria-label="Navigation results">{matchingCommands.map((action, index) => <button key={action.page} id={`quick-nav-option-${index}`} type="button" role="option" aria-selected={index === commandSelection} className={index === commandSelection ? 'command-option selected' : 'command-option'} onMouseEnter={() => setCommandSelection(index)} onClick={() => go(action.page)}><span className="command-option-icon" aria-hidden="true">{action.icon}</span><span className="command-option-copy"><strong>{action.label}</strong><small>{action.description}</small></span><kbd>↵</kbd></button>)}</div>{matchingCommands.length === 0 && <div className="command-empty">No matching page. Try a shorter search.</div>}<div className="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> Move</span><span><kbd>Enter</kbd> Open</span><span><kbd>Esc</kbd> Close</span></div></section></div>}
     {page === 'Home' && <HomePage go={go} />}
@@ -216,15 +220,22 @@ function App() {
     {page === 'Messages' && <MessagesPage conversations={playerThreads} activeId={activeThread} setActiveId={setActiveThread} onSend={(id, body) => sendMessage(id, body, 'player')} go={go} />}
     {page === 'Organizations' && <OrganizationsPage go={go} />}
     {page === 'For organizations' && <OrganizationPage go={go} account={account} />}
-    {page === 'My profile' && <ProfilePage account={account} name={profileName} setName={setProfileName} visible={visible} setVisible={setVisible} onNotice={showNotice} age={age} setAge={setAge} onOpenTrust={() => go('Trust & safety')} onSave={saveProfile} onLogOut={logOut} onExport={exportAccountData} onDeleteAccount={removeAccount} onCreate={() => go('Sign up')} />}
+    {page === 'My profile' && <ProfilePage account={account} name={profileName} setName={setProfileName} visible={visible} setVisible={setVisible} onNotice={showNotice} age={age} setAge={setAge} onOpenTrust={() => go('Trust & safety')} profile={profileFields} setProfile={setProfileFields} guardianHold={guardianHold} onSave={saveProfile} onLogOut={logOut} onExport={exportAccountData} onDeleteAccount={removeAccount} onCreate={() => go('Sign up')} />}
     {page === 'Applications' && <ApplicationsPage applications={applications} updateStatus={updateStatus} onNotice={showNotice} />}
     {page === 'Trust & safety' && <TrustPage onReport={() => setReportOpen(true)} onModeration={() => go('Moderation')} onPrivacy={() => go('Privacy')} />}
-    {page === 'Moderation' && <ModerationPage />}
+    {page === 'Moderation' && <ModerationPage reports={reports} feedback={feedbackLog} />}
     {page === 'Resources' && <ResourcesPage />}
     
     <footer className="footer"><div className="footer-main"><div><a className="brand footer-brand" href="#home" onClick={(event) => { event.preventDefault(); go('Home') }}><span className="brand-symbol">V<span>.</span></span><span className="brand-text">VAYNTR<span>TALENT</span></span></a><p className="footer-tagline">Find your next team. Build with care.</p></div><div className="footer-nav"><button onClick={() => go('Marketplace')}>Marketplace</button><button onClick={() => go('Players')}>Players</button><button onClick={() => go('Organizations')}>Organizations</button><button onClick={() => go('Messages')}>Messages</button><button onClick={() => go('Resources')}>Resources</button><button onClick={() => go('Trust & safety')}>Trust &amp; safety</button><button onClick={() => go('For organizations')}>For organizations</button><button onClick={() => go('My profile')}>My profile</button><button onClick={() => go('Applications')}>Applications</button><button onClick={() => go('Sign up')}>Join free</button><button onClick={() => go('Log in')}>Log in</button><button onClick={() => go('Privacy')}>Privacy</button></div><div className="footer-contact"><strong>Need help?</strong><button onClick={() => setFeedbackOpen(true)}>Contact support</button><span>Safety and moderation questions welcome</span></div></div><div className="footer-bottom"><span>© 2026 VAYNTR Talent</span><span>Recruitment is not guaranteed. Evaluate every opportunity carefully.</span><button onClick={() => go('Privacy')}>Privacy &amp; safety</button></div></footer>
-    {reportOpen && <ReportDialog onClose={() => setReportOpen(false)} onSubmit={(reason) => { setReportOpen(false); showNotice(`Report saved on this device (${reason}).`) }} />}
-    <FeedbackWidget onNotice={showNotice} open={feedbackOpen} setOpen={setFeedbackOpen} />
+    {reportOpen && <ReportDialog onClose={() => setReportOpen(false)} onSubmit={({ reason, details }) => {
+      setReportOpen(false)
+      const target = selected ? `${selected.org} — ${selected.title}` : `${page} page`
+      const record = recordReport({ reason, details, target, reporter: account?.email ?? 'Guest on this device' })
+      if (!record) return showNotice('The report could not be saved: this browser is blocking storage. Nothing was recorded.')
+      setReports(listReports())
+      showNotice(`Report saved on this device (${reason}). No moderator receives it yet.`)
+    }} />}
+    <FeedbackWidget onNotice={showNotice} open={feedbackOpen} setOpen={setFeedbackOpen} onSaved={() => setFeedbackLog(listFeedback())} />
   </div>
 }
 function HomePage({ go }: { go: (page: string) => void }) {
@@ -462,13 +473,19 @@ function OrganizationPage({ go, account }: { go: (x: string) => void; account: A
 }
 function ProfilePage({
   account, name, setName, visible, setVisible, onNotice, age, setAge, onOpenTrust,
-  onSave, onLogOut, onExport, onDeleteAccount, onCreate,
+  profile, setProfile, guardianHold, onSave, onLogOut, onExport, onDeleteAccount, onCreate,
 }: {
   account: Account | null; name: string; setName: (x: string) => void; visible: boolean; setVisible: (x: boolean) => void
   onNotice: (x: string) => void; age: number | null; setAge: (x: number | null) => void; onOpenTrust: () => void
+  profile: Profile; setProfile: (x: Profile) => void; guardianHold: string
   onSave: () => void; onLogOut: () => void; onExport: () => void; onDeleteAccount: () => void; onCreate: () => void
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const update = (patch: Partial<Profile>) => setProfile({ ...profile, ...patch })
+  const fromSignup = account
+    ? [account.answers.game, account.answers.rank, account.answers.creatorKind, account.answers.orgKind].filter(Boolean).join(' · ')
+    : ''
+  const discoveryOn = visible && !guardianHold
   return <section className="page-wrap wrap">
     <div className="page-heading"><div className="eyebrow">YOUR PROFILE</div><h1>Your path.<br /><span>Your terms.</span></h1><p>Profiles are private by default. Share only the information you choose with each application.</p></div>
     <div className="profile-layout">
@@ -477,23 +494,25 @@ function ProfilePage({
         {account
           ? <div className="profile-account"><div><strong>{account.email}</strong><span>{roleLabels[account.role]} · {account.region}</span></div><button type="button" className="text-link" onClick={onLogOut}>Log out</button></div>
           : <p className="profile-account-note">You are browsing without an account. <button type="button" className="text-link" onClick={onCreate}>Create a free account</button> to keep these details.</p>}
+        {fromSignup ? <p className="profile-signup-note">From your sign-up: <strong>{fromSignup}</strong>. Edit anything below.</p> : null}
+        {guardianHold ? <p className="age-profile-note blocked">{guardianHold}</p> : null}
         <div className="form-grid">
           <label className="form-field span-2">Display name / chosen name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. chosen name" maxLength={60} /></label>
-          <label className="form-field">Region<input placeholder="e.g. North America" /></label>
-          <label className="form-field">Time zone<input placeholder="e.g. UTC−5" /></label>
-          <label className="form-field span-2">Languages<input placeholder="e.g. English, Spanish" /></label>
-          <label className="form-field span-2">Desired roles<input placeholder="e.g. Analyst, player, editor" /></label>
-          <label className="form-field span-2">Games / content areas<input placeholder="e.g. VALORANT, FPS analysis" /></label>
-          <label className="form-field span-2">Skills<textarea rows={3} placeholder="Skills you'd like to highlight" /></label>
-          <label className="form-field">Experience<select defaultValue=""><option value="" disabled>Select experience</option><option>Learning / aspiring</option><option>Some team or project experience</option><option>Experienced</option></select></label>
-          <label className="form-field">Availability<input placeholder="e.g. 5 hrs/week" /></label>
-          <label className="form-field span-2">Portfolio links<input placeholder="https://… (optional)" /></label>
-          <label className="form-field span-2">Optional gaming handles / achievements<input placeholder="Only add public handles you choose to share" /></label>
-          <label className="form-field">Compensation expectations<input placeholder="Optional; explain clearly" /></label>
+          <label className="form-field">Region<input value={profile.region} onChange={(e) => update({ region: e.target.value })} placeholder="e.g. North America" maxLength={60} /></label>
+          <label className="form-field">Time zone<input value={profile.timezone} onChange={(e) => update({ timezone: e.target.value })} placeholder="e.g. UTC−5" maxLength={40} /></label>
+          <label className="form-field span-2">Languages<input value={profile.languages} onChange={(e) => update({ languages: e.target.value })} placeholder="e.g. English, Spanish" maxLength={120} /></label>
+          <label className="form-field span-2">Desired roles<input value={profile.desiredRoles} onChange={(e) => update({ desiredRoles: e.target.value })} placeholder="e.g. Analyst, player, editor" maxLength={120} /></label>
+          <label className="form-field span-2">Games / content areas<input value={profile.games} onChange={(e) => update({ games: e.target.value })} placeholder="e.g. VALORANT, FPS analysis" maxLength={120} /></label>
+          <label className="form-field span-2">Skills<textarea rows={3} value={profile.skills} onChange={(e) => update({ skills: e.target.value })} placeholder="Skills you'd like to highlight" maxLength={600} /></label>
+          <label className="form-field">Experience<select value={profile.experience} onChange={(e) => update({ experience: e.target.value })}><option value="">Select experience</option><option>Learning / aspiring</option><option>Some team or project experience</option><option>Experienced</option></select></label>
+          <label className="form-field">Availability<input value={profile.availability} onChange={(e) => update({ availability: e.target.value })} placeholder="e.g. 5 hrs/week" maxLength={40} /></label>
+          <label className="form-field span-2">Portfolio links<input value={profile.portfolio} onChange={(e) => update({ portfolio: e.target.value })} placeholder="https://… (optional)" maxLength={200} /></label>
+          <label className="form-field span-2">Optional gaming handles / achievements<input value={profile.handles} onChange={(e) => update({ handles: e.target.value })} placeholder="Only add public handles you choose to share" maxLength={200} /></label>
+          <label className="form-field">Compensation expectations<input value={profile.compensation} onChange={(e) => update({ compensation: e.target.value })} placeholder="Optional; explain clearly" maxLength={120} /></label>
           <label className="form-field">Age<input type="number" min={13} max={99} value={age ?? ''} onChange={(event) => setAge(event.target.value ? Number(event.target.value) : null)} placeholder="e.g. 17" /></label>
         </div>
-        <div className="visibility-control"><div><strong>Allow candidate discovery</strong><span>Off by default. Real discovery should be limited to authenticated, approved organizations.</span></div><button role="switch" aria-checked={visible} aria-label="Allow candidate discovery" className={visible ? 'switch on' : 'switch'} onClick={() => setVisible(!visible)}><span /></button></div>
-        <p className="age-profile-note">Your age decides which games you can be signed for. Rocket League 13+, Apex 16+, Overwatch 17+, VALORANT and Warzone 18+. Under 18 also needs guardian consent. <button type="button" className="text-link" onClick={onOpenTrust}>See every game</button></p>
+        <div className="visibility-control"><div><strong>Allow candidate discovery</strong><span>{guardianHold ? 'Locked until a parent or guardian confirms this account.' : 'Off by default. Real discovery should be limited to authenticated, approved organizations.'}</span></div><button role="switch" aria-checked={discoveryOn} aria-label="Allow candidate discovery" disabled={Boolean(guardianHold)} className={discoveryOn ? 'switch on' : 'switch'} onClick={() => setVisible(!visible)}><span /></button></div>
+        <p className="age-profile-note">Your age decides which games you can be signed for. Rocket League 13+, Apex 16+, Overwatch 17+, VALORANT and Warzone 18+. A game with no verified rule is treated as 18+ until one is added. Under 18 also needs guardian consent. <button type="button" className="text-link" onClick={onOpenTrust}>See every game</button></p>
         <div className="form-actions">
           <button className="button button-red" onClick={onSave}>Save profile</button>
           {account ? <button type="button" className="text-link" onClick={onExport}>Export my data</button> : null}
@@ -501,33 +520,50 @@ function ProfilePage({
         </div>
         <p className="fine-print">Share only what you are comfortable showing an organization. Never enter identity documents, home address, or financial details.</p>
         {account && confirmDelete ? <div className="delete-confirm" role="alertdialog" aria-labelledby="delete-title">
-          <div><strong id="delete-title">Delete this account?</strong><p>This removes the account, its password hash and its session from this browser. It cannot be undone.</p></div>
+          <div><strong id="delete-title">Delete this account?</strong><p>This removes the account, its password hash, its profile fields and its session from this browser. It cannot be undone.</p></div>
           <div className="delete-confirm-actions"><button type="button" className="button button-outline" onClick={() => setConfirmDelete(false)}>Keep my account</button><button type="button" className="button button-red" onClick={onDeleteAccount}>Delete account</button></div>
         </div> : null}
       </div>
       <aside className="profile-sidebar">
         <div className="side-callout"><span className="feature-icon">◇</span><h3>You decide what travels.</h3><p>Review every field before sharing it with a specific application. Never share sensitive data just to prove your worth.</p></div>
         <div className="auth-note"><p>{account ? 'Your profile is stored with your account on this device. Deleting the account removes both.' : 'Without an account, these fields live only in this tab and reset on reload.'}</p></div>
-        <button className="button button-outline full-width" onClick={() => onNotice('Support and appeals are not connected yet.')}>Contact support / appeal</button>
+        <button className="button button-outline full-width" onClick={() => onNotice('No monitored support or appeals channel is connected yet, so this build cannot deliver a request.')}>Contact support / appeal</button>
       </aside>
     </div>
   </section>
 }
+
 function ApplicationsPage({ applications, updateStatus, onNotice }: { applications: Application[]; updateStatus: (id: string, status: string) => void; onNotice: (x: string) => void }) { return <section className="page-wrap wrap"><div className="page-heading"><div className="eyebrow">YOUR APPLICATIONS</div><h1>Your <span>applications.</span></h1><p>Track progress and withdraw whenever you choose.</p></div><div className="applications-panel card-panel">{applications.length ? applications.map((app) => { const role = listings.find((x) => x.id === app.listingId); return <div className="application-row candidate-app" key={app.listingId}><div className="org-mark">{role?.mark}</div><div className="applicant-details"><strong>{role?.title ?? 'Role'}</strong><span>{role?.org} · Shared: {app.shared.join(', ')}</span></div><div className="candidate-status"><span className={`status-label ${app.status.toLowerCase().replace(' ', '-')}`}>{app.status}</span>{app.status !== 'Withdrawn' && <button className="text-link danger-link" onClick={() => { updateStatus(app.listingId, 'Withdrawn'); onNotice('Application withdrawn.') }}>Withdraw</button>}</div></div> }) : <div className="empty-state"><span className="button-arrow" aria-hidden="true">↗</span><h2>No applications yet</h2><p>When you apply to a role, your status will appear here.</p></div>}</div><div className="privacy-note"><strong>Application privacy</strong><p>Choose the information you share per role. In production, applications are visible only to authorized recruiters for that listing’s organization.</p></div></section> }
-function TrustPage({ onReport, onModeration, onPrivacy }: { onReport: () => void; onModeration: () => void; onPrivacy: () => void }) { return <section className="page-wrap wrap"><div className="page-heading"><div className="eyebrow">SAFETY IS A SHARED PRACTICE</div><h1>Stay sharp.<br /><span>Stay in control.</span></h1><p>Verification can’t eliminate risk. No opportunity is worth compromising your safety or privacy.</p></div><div className="trust-grid"><article className="trust-card"><span className="trust-number">01</span><h2>Check the opportunity</h2><p>Look for a clear role, defined hours, location, and written compensation terms. Verify the organization through independent channels—not only a badge or listing.</p></article><article className="trust-card"><span className="trust-number">02</span><h2>Keep control of your data</h2><p>Never provide passwords, financial credentials, identity documents, exact birth dates, or home address for a recruitment application. Share only what you choose.</p></article><article className="trust-card"><span className="trust-number">03</span><h2>Never pay to apply</h2><p>VAYNTR Talent does not charge candidates to create profiles or apply. Be wary of application fees, required purchases, and pay-to-play promises.</p></article><article className="trust-card"><span className="trust-number">04</span><h2>Know the age boundary</h2><p>Minimum ages come from each scene’s competition rules, not from us. Rocket League starts at 13, Apex at 16, Overwatch at 17, WARZONE and VALORANT at 18. Anyone under 18 needs a guardian’s consent to be signed.</p></article></div><section className="age-policy" aria-labelledby="age-policy-title"><div className="age-policy-head"><div className="eyebrow">AGE &amp; ELIGIBILITY</div><h2 id="age-policy-title">Every scene sets<br />its own floor.</h2><p>We check each listing against the rules published by the competition. Where a rulebook sets a higher age—or a country does—the higher number applies. Guardian consent is required for every player under 18, and an organization signing a minor also needs a guardian’s signature.</p></div><div className="age-grid">{gameAgePolicies.map((policy) => <div className="age-row" key={policy.game}><div className="age-row-copy"><h3>{policy.game}</h3><p>{policy.note}</p></div><span className="age-number">{policy.minAge}+</span>{policy.source ? <a href={policy.source} target="_blank" rel="noreferrer">Rules ↗</a> : null}</div>)}</div><p className="age-policy-note">Checked against published competition rules in October 2026. Organizers can apply stricter limits to a specific qualifier or event. This is guidance, not legal advice.</p></section><div className="report-panel"><div><div className="eyebrow">SEE SOMETHING WRONG?</div><h2>Report it. Block it. Get help.</h2><p>Reports go to the moderation queue with the listing or account you were viewing. Include only what you are comfortable sharing.</p></div><div className="report-buttons"><button className="button button-red" onClick={onReport}>Report a listing or account</button></div></div><div className="trust-footnote"><strong>Organization checked is not identity checked.</strong><p>Any future verification label must state the exact organization records checked and when. It must never imply that every role or individual is safe, legitimate, or endorsed by VAYNTR.</p><button className="text-link" onClick={onModeration}>Moderator review dashboard <span className="button-arrow" aria-hidden="true">↗</span></button><button className="text-link" onClick={onPrivacy}>Privacy notice &amp; your US rights <span className="button-arrow" aria-hidden="true">↗</span></button></div></section> }
-function ModerationPage() {
+function TrustPage({ onReport, onModeration, onPrivacy }: { onReport: () => void; onModeration: () => void; onPrivacy: () => void }) { return <section className="page-wrap wrap"><div className="page-heading"><div className="eyebrow">SAFETY IS A SHARED PRACTICE</div><h1>Stay sharp.<br /><span>Stay in control.</span></h1><p>Verification can’t eliminate risk. No opportunity is worth compromising your safety or privacy.</p></div><div className="trust-grid"><article className="trust-card"><span className="trust-number">01</span><h2>Check the opportunity</h2><p>Look for a clear role, defined hours, location, and written compensation terms. Verify the organization through independent channels—not only a badge or listing.</p></article><article className="trust-card"><span className="trust-number">02</span><h2>Keep control of your data</h2><p>Never provide passwords, financial credentials, identity documents, exact birth dates, or home address for a recruitment application. Share only what you choose.</p></article><article className="trust-card"><span className="trust-number">03</span><h2>Never pay to apply</h2><p>VAYNTR Talent does not charge candidates to create profiles or apply. Be wary of application fees, required purchases, and pay-to-play promises.</p></article><article className="trust-card"><span className="trust-number">04</span><h2>Know the age boundary</h2><p>Minimum ages come from each scene’s competition rules, not from us. Rocket League starts at 13, Apex at 16, Overwatch at 17, WARZONE and VALORANT at 18. Anyone under 18 needs a guardian’s consent to be signed.</p></article></div><section className="age-policy" aria-labelledby="age-policy-title"><div className="age-policy-head"><div className="eyebrow">AGE &amp; ELIGIBILITY</div><h2 id="age-policy-title">Every scene sets<br />its own floor.</h2><p>We check each listing against the rules published by the competition. Where a rulebook sets a higher age—or a country does—the higher number applies. Guardian consent is required for every player under 18, and an organization signing a minor also needs a guardian’s signature.</p></div><div className="age-grid">{gameAgePolicies.map((policy) => <div className="age-row" key={policy.game}><div className="age-row-copy"><h3>{policy.game}</h3><p>{policy.note}</p></div><span className="age-number">{policy.minAge}+</span>{policy.source ? <a href={policy.source} target="_blank" rel="noreferrer">Rules ↗</a> : null}</div>)}</div><p className="age-policy-note">Checked against published competition rules in October 2026. Organizers can apply stricter limits to a specific qualifier or event. Any game label that matches no verified rule is treated as 18+ until one is added. This is guidance, not legal advice.</p></section><div className="report-panel"><div><div className="eyebrow">SEE SOMETHING WRONG?</div><h2>Report it. Block it. Get help.</h2><p>Reports are saved on this device along with the listing or account you were viewing. They are not delivered to a moderator yet, so keep anything urgent in a channel you know is monitored.</p></div><div className="report-buttons"><button className="button button-red" onClick={onReport}>Report a listing or account</button></div></div><div className="trust-footnote"><strong>Organization checked is not identity checked.</strong><p>Any future verification label must state the exact organization records checked and when. It must never imply that every role or individual is safe, legitimate, or endorsed by VAYNTR.</p><button className="text-link" onClick={onModeration}>Moderator review dashboard <span className="button-arrow" aria-hidden="true">↗</span></button><button className="text-link" onClick={onPrivacy}>Privacy notice &amp; your US rights <span className="button-arrow" aria-hidden="true">↗</span></button></div></section> }
+function ModerationPage({ reports, feedback }: { reports: ReportRecord[]; feedback: FeedbackRecord[] }) {
   return <section className="page-wrap wrap">
-    <div className="page-heading"><div className="eyebrow">STAFF AREA</div><h1>Review with care.<br /><span>Act with context.</span></h1><p>Review reports, assign cases, and record why a decision was made.</p></div>
-    <div className="moderation-warning"><strong>Staff only.</strong><span>Access must be role-limited, case-bound, audited, and prevent unnecessary exposure to private application or profile data.</span></div>
-    <div className="mod-case-list"><div className="empty-state"><span aria-hidden="true">▦</span><h2>No reports in the queue</h2><p>Reports appear here once a report is submitted and the moderation API is connected. Nothing is seeded on this device.</p></div></div>
+    <div className="page-heading"><div className="eyebrow">STAFF AREA / LOCAL PREVIEW</div><h1>Review with care.<br /><span>Act with context.</span></h1><p>This page renders the reports and feedback stored on this device. It is not a staffed queue and it is not access-controlled: anyone using this browser can open it.</p></div>
+    <div className="moderation-warning"><strong>Not a staff tool yet.</strong><span>Real access has to be server-enforced, role-limited, case-bound and audited. Until the moderation API exists, this page reads only this device’s storage.</span></div>
+    <div className="mod-case-list">
+      {reports.length ? reports.map((report) => <article className="mod-case" key={report.id}>
+        <div className="mod-case-head"><strong>{report.reason}</strong><span className="status-label">{report.status}</span></div>
+        <p>{report.details || 'No details were given.'}</p>
+        <div className="mod-case-facts"><span>Target: {report.target}</span><span>From: {report.reporter}</span><span>{formatWhen(report.createdAt)}</span><span>On this device only</span></div>
+      </article>) : <div className="empty-state"><span aria-hidden="true">▦</span><h2>No reports in the queue</h2><p>Reports filed from this device appear here immediately. Nothing is seeded, and nothing is sent to a moderator.</p></div>}
+    </div>
+    <section className="mod-feedback" aria-labelledby="mod-feedback-title">
+      <div className="age-policy-head"><div className="eyebrow">FEEDBACK</div><h2 id="mod-feedback-title">Notes left on this device.</h2><p>{feedback.length} saved. Feedback is stored locally and is not delivered to a product team yet.</p></div>
+      {feedback.length ? feedback.map((entry) => <article className="mod-case" key={entry.id}>
+        <div className="mod-case-head"><strong>{entry.topic}</strong><span className="status-label">Local</span></div>
+        <p>{entry.details || 'No details were given.'}</p>
+        <div className="mod-case-facts"><span>{formatWhen(entry.createdAt)}</span></div>
+      </article>) : <p className="mod-empty">No feedback saved on this device yet.</p>}
+    </section>
     <div className="trust-footnote"><strong>Moderation ownership must be assigned before launch.</strong><p>Define staffed hours, urgent-risk escalation, response times, evidence handling, retention, user notification, appeals, and audit review.</p></div>
   </section>
 }
+
 function ResourcesPage() { return <section className="page-wrap wrap"><div className="page-heading"><div className="eyebrow">FIELD NOTES / PUBLIC EDUCATION</div><h1>Play with purpose.<br /><span>Create with intent.</span></h1><p>Practical starting points, not shortcuts. Evidence and platform guidance do not promise skill, career, audience, or income outcomes.</p></div><div className="resource-date">REVIEWED OCTOBER 22, 2026 · SOURCES LINKED BELOW EACH GUIDE</div><div className="guide-grid"><article className="guide-card"><div className="guide-visual guide-red"><span>01</span><span>REPLAY / REFLECT / REPEAT</span></div><div className="guide-body"><span className="guide-tag">COMPETITIVE DEVELOPMENT · ALL LEVELS</span><h2>A useful VOD review starts with a question.</h2><p>Pick one moment, not an entire match. Describe the situation, what you noticed, and one alternative you could try next time. Keep the review specific to the game and role.</p><h3>A simple review loop</h3><ol><li>Choose a moment tied to a goal.</li><li>Write what happened without judging yourself.</li><li>Ask what information was available at the time.</li><li>Pick one small adjustment to test in a future session.</li></ol><p className="guide-caveat">This is a reflective routine, not a proven guarantee of improvement. A small qualitative study of League of Legends players reported VOD review and focused goals as perceived training practices; it does not prove causation or apply to every game.</p><a href="https://journals.humankinetics.com/view/journals/jege/1/1/article-jege.2022-0011.xml" target="_blank" rel="noreferrer">Abbott, Watson &amp; Birch (2022), Journal of Electronic Gaming and Esports ↗</a><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7447068/" target="_blank" rel="noreferrer">Nagorsky &amp; Wiemeyer (2020), PLOS ONE ↗</a><a href="https://www.nzesports.org.nz/knowledge-base/how-to-effectively-train-in-esports/" target="_blank" rel="noreferrer">NZ Esports Federation: How to Effectively Train in Esports (updated Apr 4, 2025) ↗</a></div></article><article className="guide-card"><div className="guide-visual guide-dark"><span>02</span><span>PLAN / PUBLISH / LEARN</span></div><div className="guide-body"><span className="guide-tag">CREATOR WORKFLOW · ALL PLATFORMS</span><h2>Build a publishing rhythm you can sustain.</h2><p>Start with the time you actually have. Plan a small set of ideas, choose formats that fit your workflow, then review what you learned—not just the view count.</p><h3>Try this planning checklist</h3><ol><li>Write down one audience question you can address.</li><li>Draft a clear opening that matches the content.</li><li>Choose a format and a realistic schedule.</li><li>After publishing, review audience feedback and platform analytics as context—not a prediction.</li></ol><p className="guide-caveat">Platform documentation describes tools and metrics; it cannot tell you why every viewer behaved a certain way or guarantee future reach, income, or growth. Review date: October 22, 2026.</p><a href="https://www.youtube.com/creators/grow/optimize-your-content/" target="_blank" rel="noreferrer">YouTube for Creators: Optimize &amp; evolve your content ↗</a><a href="https://support.google.com/youtube/answer/9314415?hl=en&amp;co=GENIE.Platform%3DDesktop" target="_blank" rel="noreferrer">YouTube Help: Measure key moments for audience retention ↗</a></div></article></div><div className="future-resources"><strong>Other areas to explore</strong><span>Tactical shooters · Battle royale · MOBAs · Fighting games · RTS · Sports · Racing · Card games · YouTube · TikTok · Twitch · Instagram Reels</span><p>Future guides should be reviewed for accuracy, dated, sourced, and tailored to platform and game changes.</p></div></section> }
-function FeedbackWidget({ onNotice, open, setOpen }: { onNotice: (message: string) => void; open: boolean; setOpen: (open: boolean) => void }) {
+function FeedbackWidget({ onNotice, onSaved, open, setOpen }: { onNotice: (message: string) => void; onSaved: () => void; open: boolean; setOpen: (open: boolean) => void }) {
   const [kind, setKind] = useState('')
   const [details, setDetails] = useState('')
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false)
@@ -536,11 +572,16 @@ function FeedbackWidget({ onNotice, open, setOpen }: { onNotice: (message: strin
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [setOpen])
   function submitFeedback() {
+    const saved = recordFeedback({ topic: kind || 'General note', details })
+    if (!saved) return setError('This browser refused to store the note, so nothing was saved.')
+    setError('')
     setSent(true)
-    onNotice('Feedback saved on this device.')
+    onSaved()
+    onNotice('Feedback saved on this device. It is not delivered to the product team yet.')
   }
   function startOver() {
     setSent(false)
+    setError('')
     setKind('')
     setDetails('')
   }
@@ -550,7 +591,7 @@ function FeedbackWidget({ onNotice, open, setOpen }: { onNotice: (message: strin
         <div><div className="eyebrow">QUICK FEEDBACK</div><h2 id="feedback-title">Help us improve.</h2></div>
         <button type="button" className="feedback-close" aria-label="Close feedback" onClick={() => setOpen(false)}>×</button>
       </div>
-      {sent ? <div className="feedback-success"><span className="feedback-success-mark" aria-hidden="true">✓</span><h3>Got it. Thank you.</h3><p>Your note is saved on this device. Delivery to the product team is not connected yet.</p><div className="feedback-success-actions"><button type="button" className="button button-outline" onClick={startOver}>Send another</button><button type="button" className="button button-red" onClick={() => { setOpen(false); startOver() }}>Close</button></div></div> : <>
+      {sent ? <div className="feedback-success"><span className="feedback-success-mark" aria-hidden="true">✓</span><h3>Got it. Thank you.</h3><p>Your note is saved on this device. It is not delivered to the product team yet.</p><div className="feedback-success-actions"><button type="button" className="button button-outline" onClick={startOver}>Send another</button><button type="button" className="button button-red" onClick={() => { setOpen(false); startOver() }}>Close</button></div></div> : <>
       <p className="feedback-prompt">What would you like us to know about VAYNTR Talent?</p>
       <div className="feedback-options" role="group" aria-label="Feedback type">
         <button type="button" aria-pressed={kind === 'Looks good'} className={kind === 'Looks good' ? 'feedback-option chosen' : 'feedback-option'} onClick={() => setKind('Looks good')}><span aria-hidden="true"><Check size={15} strokeWidth={2.4} /></span><span>Looks good</span></button>
@@ -560,11 +601,18 @@ function FeedbackWidget({ onNotice, open, setOpen }: { onNotice: (message: strin
       <label className="feedback-details"><span className="feedback-label">Details <em>(optional)</em></span>
         <textarea aria-label="Optional details" maxLength={1000} value={details} onChange={(event) => setDetails(event.target.value)} placeholder="Share a suggestion or describe what could be better. Please don't include private or sensitive information." rows={3} />
       </label>
+      {error ? <p className="field-error" role="alert">{error}</p> : null}
       <button type="button" className="button button-red feedback-submit" disabled={!kind && !details.trim()} onClick={submitFeedback}>Submit feedback <span className="button-arrow" aria-hidden="true">↗</span></button>
       </>}
     </section>}
     <button type="button" className={open ? 'feedback-launch is-open' : 'feedback-launch'} aria-expanded={open} aria-haspopup="dialog" aria-label={open ? 'Close feedback panel' : 'Open feedback panel'} onClick={() => setOpen(!open)}><span className="feedback-launch-icon" aria-hidden="true">{open ? '×' : '✳'}</span><span>{open ? 'Close' : 'Feedback'}</span></button>
   </aside>
 }
-function ReportDialog({ onClose, onSubmit }: { onClose: () => void; onSubmit: (reason: string) => void }) { const [reason, setReason] = useState('Misleading or suspicious listing'); const [description, setDescription] = useState(''); return <div className="dialog-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}><section className="report-dialog" role="dialog" aria-modal="true" aria-labelledby="report-title"><button className="dialog-close" onClick={onClose} aria-label="Close report dialog">×</button><div className="eyebrow">REPORT</div><h2 id="report-title">Help us understand.</h2><p>Reports are saved on this device. Include only what you are comfortable sharing.</p><label className="form-field">What are you reporting?<select value={reason} onChange={(e) => setReason(e.target.value)}><option>Misleading or suspicious listing</option><option>Request for fees or purchases</option><option>Harassment or unsafe contact</option><option>Privacy or personal data concern</option><option>Other concern</option></select></label><label className="form-field">Details (do not include sensitive personal information)<textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the concern" /></label><div className="dialog-actions"><button className="button button-outline" onClick={onClose}>Cancel</button><button className="button button-red" onClick={() => onSubmit(reason)}>Submit report</button></div><p className="fine-print">Need urgent help? Use an appropriate local emergency or safeguarding service.</p></section></div> }
+
+function ReportDialog({ onClose, onSubmit }: { onClose: () => void; onSubmit: (input: { reason: string; details: string }) => void }) {
+  const [reason, setReason] = useState('Misleading or suspicious listing')
+  const [description, setDescription] = useState('')
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}><section className="report-dialog" role="dialog" aria-modal="true" aria-labelledby="report-title"><button className="dialog-close" onClick={onClose} aria-label="Close report dialog">×</button><div className="eyebrow">REPORT</div><h2 id="report-title">Help us understand.</h2><p>This report is saved on this device only. It is not delivered to a moderator yet, so do not rely on it for anything urgent.</p><label className="form-field">What are you reporting?<select value={reason} onChange={(e) => setReason(e.target.value)}><option>Misleading or suspicious listing</option><option>Request for fees or purchases</option><option>Harassment or unsafe contact</option><option>Privacy or personal data concern</option><option>Other concern</option></select></label><label className="form-field">Details (do not include sensitive personal information)<textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the concern" maxLength={2000} /></label><div className="dialog-actions"><button className="button button-outline" onClick={onClose}>Cancel</button><button className="button button-red" onClick={() => onSubmit({ reason, details: description })}>Submit report</button></div><p className="fine-print">Need urgent help? Use an appropriate local emergency or safeguarding service.</p></section></div>
+}
+
 export default App

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { agePolicyFor, canonicalGame } from '../app/age-policy'
 
 // Every organization, player, conversation and address the app used to invent.
 // None of them may appear in the shipped markup or in any rendered page.
@@ -119,14 +120,34 @@ test('the profile saves the age locally and says so', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Delete account' })).toHaveCount(0)
 })
 
-test('reporting a listing does not claim to reach moderators', async ({ page }) => {
+test('a report is really stored, reaches the local queue, and survives a reload', async ({ page }) => {
   await page.goto('/')
   await page.locator('footer').getByRole('button', { name: 'Trust & safety', exact: true }).click()
   await page.getByRole('button', { name: 'Report a listing or account' }).click()
   const dialog = page.getByRole('dialog')
-  await expect(dialog).toContainText('Reports are saved on this device')
+  await expect(dialog).toContainText('saved on this device only')
+  await dialog.locator('select').selectOption('Request for fees or purchases')
+  await dialog.locator('textarea').fill('They asked for a 40 USD tryout fee.')
   await dialog.getByRole('button', { name: 'Submit report' }).click()
   await expect(page.getByRole('status')).toContainText('Report saved on this device')
+  await expect(page.getByRole('status')).toContainText('No moderator receives it yet')
+
+  // Everything the form collected is in storage, not just the reason.
+  const stored = await page.evaluate(() => localStorage.getItem('vayntr.reports.v1') ?? '')
+  expect(stored).toContain('Request for fees or purchases')
+  expect(stored).toContain('They asked for a 40 USD tryout fee.')
+  expect(stored).toContain('Trust & safety page')
+  expect(stored).toContain('Guest on this device')
+
+  // The queue shows the report instead of discarding it, and it outlives a reload.
+  await page.reload()
+  await page.locator('footer').getByRole('button', { name: 'Trust & safety', exact: true }).click()
+  await page.getByRole('button', { name: /Moderator review dashboard/ }).click()
+  await expect(page.getByRole('heading', { name: /Review with care/i })).toBeVisible()
+  await expect(page.locator('.mod-case')).toHaveCount(1)
+  await expect(page.locator('.mod-case').first()).toContainText('Request for fees or purchases')
+  await expect(page.locator('.mod-case').first()).toContainText('They asked for a 40 USD tryout fee.')
+  await expect(page.locator('.moderation-warning')).toContainText('Not a staff tool yet')
 })
 
 test('feedback shows an in-place confirmation after submitting', async ({ page }) => {
@@ -141,6 +162,11 @@ test('feedback shows an in-place confirmation after submitting', async ({ page }
   await panel.getByRole('button', { name: /Submit feedback/ }).click()
   await expect(panel.getByRole('heading', { name: /Got it/i })).toBeVisible()
   await expect(page.getByRole('status')).toContainText('Feedback saved on this device')
+
+  // The note is really stored, and the moderation page counts it.
+  const stored = await page.evaluate(() => localStorage.getItem('vayntr.feedback.v1') ?? '')
+  expect(stored).toContain('Add a way to preview creator profiles.')
+  expect(stored).toContain('Feature idea')
 })
 
 test('home page uses the redesigned surfaces and only previews real roles', async ({ page }) => {
@@ -225,7 +251,8 @@ test('a free player account is created with guardian consent and survives a relo
 
   await page.locator('.signup-actions').getByRole('button', { name: /Create free account/ }).click()
   await expect(page.getByRole('heading', { name: /Welcome,/ })).toBeVisible()
-  await expect(page.getByText('Guardian confirmation pending')).toBeVisible()
+  await expect(page.getByText('Guardian confirmation pending', { exact: true })).toBeVisible()
+  await expect(page.locator('.guardian-banner')).toContainText('A parent or guardian has to confirm this account')
   await expect(page.locator('.account-chip')).toContainText('Test Player')
 
   // Only a salted hash is stored, never the password itself.
@@ -233,6 +260,11 @@ test('a free player account is created with guardian consent and survives a relo
   expect(stored).toContain('"hash"')
   expect(stored).toContain('"salt"')
   expect(stored).not.toContain(PASSWORD)
+  // The role answers from step three are part of the account, not discarded.
+  expect(stored).toContain('"answers"')
+  expect(stored).toContain('Rocket League')
+  expect(stored).toContain('"privacyAcceptedAt"')
+  expect(stored).toContain('"guardianConfirmation":"pending"')
 
   await page.reload()
   await expect(page.locator('.account-chip')).toContainText('Test Player')
@@ -245,6 +277,87 @@ test('a free player account is created with guardian consent and survives a relo
   await expect(page.getByRole('status')).toContainText('Profile saved to your account')
   await page.reload()
   await expect(page.locator('.account-chip')).toContainText('Test Player Two')
+})
+
+async function createPlayer(page: import('@playwright/test').Page, account: { name: string; email: string; age: number; game: string }) {
+  await page.goto('/')
+  await openSignup(page)
+  await page.locator('.role-choices').getByRole('button', { name: /^Player/ }).click()
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await fillAccountStep(page, account)
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('label.form-field').filter({ hasText: 'Primary game' }).locator('select').selectOption(account.game)
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.consent-list label').filter({ hasText: 'privacy notice and the safety rules' }).locator('input').check()
+  if (account.age < 18) await page.locator('.consent-list label').filter({ hasText: 'parent or guardian has read' }).locator('input').check()
+  await page.locator('.signup-actions').getByRole('button', { name: /Create free account/ }).click()
+  await expect(page.locator('.account-chip')).toContainText(account.name)
+}
+
+test('every profile field is stored on the account and returns after a reload', async ({ page }) => {
+  await createPlayer(page, { name: 'Profile Tester', email: 'profile@example.com', age: 22, game: 'Overwatch 2' })
+  await page.locator('.account-chip').click()
+  await expect(page.locator('.profile-signup-note')).toContainText('Overwatch 2')
+
+  await page.getByLabel('Region').fill('North America')
+  await page.getByLabel('Time zone').fill('UTC−5')
+  await page.getByLabel('Languages').fill('English, Spanish')
+  await page.getByLabel('Desired roles').fill('Analyst')
+  await page.getByLabel('Games / content areas').fill('VALORANT')
+  await page.getByLabel('Skills').fill('VOD review, comms')
+  await page.locator('label.form-field').filter({ hasText: 'Experience' }).locator('select').selectOption('Experienced')
+  await page.getByLabel('Availability').fill('8 hrs/week')
+  await page.getByLabel('Portfolio links').fill('https://example.com/reel')
+  await page.getByLabel('Optional gaming handles / achievements').fill('@tester')
+  await page.getByLabel('Compensation expectations').fill('400 USD / month')
+  await page.getByRole('switch', { name: 'Allow candidate discovery' }).click()
+  await page.getByRole('button', { name: 'Save profile' }).click()
+  await expect(page.getByRole('status')).toContainText('Profile saved to your account')
+
+  await page.reload()
+  await page.locator('footer').getByRole('button', { name: 'My profile', exact: true }).click()
+  await expect(page.getByLabel('Region')).toHaveValue('North America')
+  await expect(page.getByLabel('Time zone')).toHaveValue('UTC−5')
+  await expect(page.getByLabel('Languages')).toHaveValue('English, Spanish')
+  await expect(page.getByLabel('Skills')).toHaveValue('VOD review, comms')
+  await expect(page.locator('label.form-field').filter({ hasText: 'Experience' }).locator('select')).toHaveValue('Experienced')
+  await expect(page.getByLabel('Portfolio links')).toHaveValue('https://example.com/reel')
+  await expect(page.getByLabel('Compensation expectations')).toHaveValue('400 USD / month')
+  // Discovery is account state, not just something this tab remembers.
+  await expect(page.getByRole('switch', { name: 'Allow candidate discovery' })).toHaveAttribute('aria-checked', 'true')
+})
+
+test('a minor account stays locked until a guardian confirms', async ({ page }) => {
+  await createPlayer(page, { name: 'Minor Tester', email: 'minor@example.com', age: 15, game: 'Rocket League' })
+  await expect(page.locator('.guardian-banner')).toContainText('Guardian confirmation pending')
+
+  await page.locator('.account-chip').click()
+  const toggle = page.getByRole('switch', { name: 'Allow candidate discovery' })
+  await expect(toggle).toBeDisabled()
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+
+  // Saving cannot turn discovery on while the account is held.
+  await page.getByRole('button', { name: 'Save profile' }).click()
+  await expect(page.getByRole('status')).toContainText('Profile saved to your account')
+  const stored = await page.evaluate(() => localStorage.getItem('vayntr.accounts.v1') ?? '')
+  expect(stored).toContain('"candidateVisible":false')
+  expect(stored).toContain('"guardianConfirmation":"pending"')
+  await expect(toggle).toHaveAttribute('aria-checked', 'false')
+})
+
+test('game labels resolve through aliases and an unverified game fails closed at 18+', () => {
+  expect(canonicalGame('valorant')).toBe('VALORANT')
+  expect(canonicalGame('Warzone')).toBe('Call of Duty / Warzone')
+  expect(canonicalGame('  rocket   league ')).toBe('Rocket League')
+  expect(canonicalGame('Rocket League')).toBe('Rocket League')
+  expect(agePolicyFor('cs2').minAge).toBe(16)
+  expect(agePolicyFor('VALORANT').minAge).toBe(18)
+  expect(agePolicyFor('VALORANT').verified).toBe(true)
+
+  const unknown = agePolicyFor('Unlisted Arena Shooter')
+  expect(unknown.verified).toBe(false)
+  expect(unknown.minAge).toBe(18)
+  expect(agePolicyFor('').minAge).toBe(18)
 })
 
 test('logging out and back in works and rejects the wrong password', async ({ page }) => {

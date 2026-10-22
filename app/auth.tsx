@@ -9,6 +9,59 @@ import { Check, ShieldCheck } from 'lucide-react'
 
 export type AccountRole = 'player' | 'creator' | 'organization'
 
+/** The role-specific answers collected in sign-up step three. */
+export type SignupAnswers = {
+  game: string
+  role: string
+  rank: string
+  availability: string
+  lookingFor: string
+  salaryAsk: string
+  creatorKind: string
+  platforms: string
+  portfolio: string
+  rate: string
+  orgKind: string
+  orgFocus: string
+  orgSite: string
+  hiringFor: string
+}
+
+/** Everything the profile form stores on the account. */
+export type Profile = {
+  region: string
+  timezone: string
+  languages: string
+  desiredRoles: string
+  games: string
+  skills: string
+  experience: string
+  availability: string
+  portfolio: string
+  handles: string
+  compensation: string
+}
+
+/** Consent is recorded with a timestamp so the state is auditable, not inferred. */
+export type ConsentRecord = {
+  privacyAcceptedAt: string
+  guardianAcceptedAt: string | null
+  marketingOptInAt: string | null
+  guardianEmail: string
+  guardianConfirmation: 'pending' | 'not_required'
+}
+
+export const emptyAnswers: SignupAnswers = {
+  game: '', role: '', rank: '', availability: '', lookingFor: '', salaryAsk: '',
+  creatorKind: '', platforms: '', portfolio: '', rate: '',
+  orgKind: '', orgFocus: '', orgSite: '', hiringFor: '',
+}
+
+export const emptyProfile: Profile = {
+  region: '', timezone: '', languages: '', desiredRoles: '', games: '', skills: '',
+  experience: '', availability: '', portfolio: '', handles: '', compensation: '',
+}
+
 export type Account = {
   id: string
   name: string
@@ -19,9 +72,24 @@ export type Account = {
   guardianEmail: string
   guardianPending: boolean
   marketingOptIn: boolean
+  candidateVisible: boolean
+  answers: SignupAnswers
+  profile: Profile
+  consent: ConsentRecord
+  createdAt: string
 }
 
-type StoredAccount = Account & { salt: string; hash: string; iterations: number; createdAt: string }
+type StoredAccount = Account & { salt: string; hash: string; iterations: number }
+
+/**
+ * Minors can browse, but applying, messaging and candidate discovery stay locked
+ * until a guardian confirmation arrives. No confirmation email exists yet, so in
+ * this build the lock is permanent — stated plainly wherever it applies.
+ */
+export function guardianHoldReason(account: Account | null) {
+  if (!account?.guardianPending) return ''
+  return 'A parent or guardian has to confirm this account before you can apply, message an organization, or turn on candidate discovery. No guardian email is sent yet, so those stay locked on this device.'
+}
 
 type Session = { accountId: string; expiresAt: number; persistent: boolean }
 
@@ -130,6 +198,18 @@ function publicAccount(account: StoredAccount): Account {
     guardianEmail: account.guardianEmail,
     guardianPending: account.guardianPending,
     marketingOptIn: account.marketingOptIn,
+    // Accounts stored before these fields existed still load with sane defaults.
+    candidateVisible: account.candidateVisible ?? false,
+    answers: { ...emptyAnswers, ...account.answers },
+    profile: { ...emptyProfile, ...account.profile },
+    consent: account.consent ?? {
+      privacyAcceptedAt: account.createdAt ?? new Date().toISOString(),
+      guardianAcceptedAt: null,
+      marketingOptInAt: account.marketingOptIn ? account.createdAt ?? null : null,
+      guardianEmail: account.guardianEmail,
+      guardianConfirmation: account.guardianPending ? 'pending' : 'not_required',
+    },
+    createdAt: account.createdAt,
   }
 }
 
@@ -192,6 +272,9 @@ export type RegisterInput = {
   region: string
   guardianEmail: string
   marketingOptIn: boolean
+  answers: SignupAnswers
+  profile: Profile
+  consent: ConsentRecord
 }
 
 export async function register(input: RegisterInput): Promise<Account> {
@@ -214,6 +297,10 @@ export async function register(input: RegisterInput): Promise<Account> {
     guardianEmail: input.guardianEmail.trim().toLowerCase(),
     guardianPending: input.age < 18,
     marketingOptIn: input.marketingOptIn,
+    candidateVisible: false,
+    answers: input.answers,
+    profile: input.profile,
+    consent: input.consent,
     salt: toBase64(salt),
     hash: toBase64(hash),
     iterations: PBKDF2_ITERATIONS,
@@ -253,10 +340,12 @@ export function deleteAccount(id: string) {
   endSession()
 }
 
-export function updateAccount(id: string, patch: { name?: string; age?: number }) {
+export function updateAccount(id: string, patch: { name?: string; age?: number; profile?: Profile; candidateVisible?: boolean }): Account | undefined {
   const accounts = readAccounts().map((entry) => entry.id === id ? { ...entry, ...patch } : entry)
   writeAccounts(accounts)
-  return accounts.find((entry) => entry.id === id)
+  const updated = accounts.find((entry) => entry.id === id)
+  // Return the public shape: the salt and hash must never reach component state or an export.
+  return updated ? publicAccount(updated) : undefined
 }
 
 /* -------------------------------------------------------------------------- */
@@ -400,6 +489,7 @@ export function SignUpPage({ go, games, ageFloors, onCreated }: { go: (page: str
     if (isEmailTaken(email)) return setError('An account with that email already exists on this device. Use Log in instead.')
     setBusy(true)
     try {
+      const now = new Date().toISOString()
       const account = await register({
         name,
         email,
@@ -409,6 +499,25 @@ export function SignUpPage({ go, games, ageFloors, onCreated }: { go: (page: str
         region: country === 'United States' ? region : country,
         guardianEmail: isMinor ? guardianEmail : '',
         marketingOptIn: marketing,
+        // The answers from step three belong to the account; they used to be dropped here.
+        answers: {
+          game, role: playerRole, rank, availability, lookingFor, salaryAsk,
+          creatorKind, platforms, portfolio, rate,
+          orgKind, orgFocus, orgSite, hiringFor,
+        },
+        profile: {
+          ...emptyProfile,
+          availability,
+          portfolio: role === 'creator' ? portfolio : '',
+          compensation: role === 'player' ? salaryAsk : role === 'creator' ? rate : '',
+        },
+        consent: {
+          privacyAcceptedAt: now,
+          guardianAcceptedAt: isMinor && guardianConsent ? now : null,
+          marketingOptInAt: marketing ? now : null,
+          guardianEmail: isMinor ? guardianEmail.trim().toLowerCase() : '',
+          guardianConfirmation: isMinor ? 'pending' : 'not_required',
+        },
       })
       setCreated(account)
       setPassword('')
@@ -460,9 +569,10 @@ export function SignUpPage({ go, games, ageFloors, onCreated }: { go: (page: str
           <div><dt>Email</dt><dd>{created.email}</dd></div>
           <div><dt>Region</dt><dd>{created.region}</dd></div>
           <div><dt>Age</dt><dd>{created.age}</dd></div>
+          <div><dt>Saved to your profile</dt><dd>{created.answers.game || created.answers.creatorKind || created.answers.orgKind || 'Not answered'}</dd></div>
           <div><dt>Status</dt><dd>{created.guardianPending ? 'Guardian confirmation pending' : 'Active on this device'}</dd></div>
         </dl>
-        {created.guardianPending ? <p className="signup-note">We ask {created.guardianEmail} to confirm this account. No email is sent until email delivery is connected.</p> : null}
+        {created.guardianPending ? <p className="signup-note">Guardian confirmation is not verified yet: no email is sent. Applying, messaging and candidate discovery stay locked until a guardian confirms, so on this device they remain locked.</p> : null}
         <div className="signup-actions">
           <button className="button button-red" onClick={() => go('My profile')}>Open my profile <span className="button-arrow" aria-hidden="true">↗</span></button>
           <button className="button button-outline" onClick={() => go(created.role === 'organization' ? 'For organizations' : 'Marketplace')}>{created.role === 'organization' ? 'Open the organization workspace' : 'Browse roles'}</button>
@@ -562,7 +672,7 @@ export function SignUpPage({ go, games, ageFloors, onCreated }: { go: (page: str
           <ul>
             <li>Free to join. We take no payment details and charge no application fees.</li>
             <li>Your password is stored only as a salted PBKDF2 hash, never as text.</li>
-            <li>We never sell or share your personal information, and this site loads no ad, pixel, or analytics scripts.</li>
+            <li>We never sell or share your personal information, and this site loads no ad, pixel, analytics, or third-party font request.</li>
             <li>Profiles are private by default. You can ask to see, correct, delete, or opt out at any time.</li>
           </ul>
         </div>
@@ -656,10 +766,10 @@ export function PrivacyPage({ go }: { go: (page: string) => void }) {
     </div>
 
     <div className="trust-grid">
-      <article className="trust-card"><span className="trust-number">01</span><h2>Who can create an account</h2><p>Anyone 13 or older can sign up free, with no invitation. Under 13 cannot create an account: COPPA bars collecting their personal information without verifiable parental consent, which this service does not offer. Anyone 13–17 needs a parent or guardian to agree, and can use the account while that confirmation is pending.</p></article>
+      <article className="trust-card"><span className="trust-number">01</span><h2>Who can create an account</h2><p>Anyone 13 or older can sign up free, with no invitation. Under 13 cannot create an account: COPPA bars collecting their personal information without verifiable parental consent, which this service does not offer. Anyone 13–17 needs a parent or guardian to agree, and can browse while that confirmation is pending — applying, messaging and discovery stay locked until a guardian confirms.</p></article>
       <article className="trust-card"><span className="trust-number">02</span><h2>What we collect</h2><p>Account and sign-in details (display or organization name, email), country and US state, your age as a number rather than a date of birth, the role answers you give, the profile content you choose, messages you send, applications you submit, and reports you file. Payment details are never requested.</p></article>
       <article className="trust-card"><span className="trust-number">03</span><h2>What we never collect</h2><p>No Social Security or tax numbers, government ID images, bank or card numbers, precise location, biometric identifiers, or health data. Never send identity documents or financial details through a profile, message, or application.</p></article>
-      <article className="trust-card"><span className="trust-number">04</span><h2>No sale, no ad tracking</h2><p>We do not sell personal information or share it for cross-context behavioral advertising, and this site loads no ad network, pixel, or third-party analytics script. Because there is nothing to sell, there is nothing to opt out of, and Global Privacy Control signals are honored by default.</p></article>
+      <article className="trust-card"><span className="trust-number">04</span><h2>No sale, no ad tracking</h2><p>We do not sell personal information or share it for cross-context behavioral advertising. This site loads no ad network, pixel, third-party analytics, or external font request: typography is served from this domain, so no visitor IP is sent to a font provider. Because there is nothing to sell, there is nothing to opt out of, and Global Privacy Control signals are honored by default.</p></article>
     </div>
 
     <section className="privacy-rights" aria-labelledby="rights-title">
@@ -682,10 +792,10 @@ export function PrivacyPage({ go }: { go: (page: string) => void }) {
     </section>
 
     <div className="trust-grid">
-      <article className="trust-card"><span className="trust-number">05</span><h2>Accounts on this device</h2><p>Until the API is connected, your account is stored in this browser’s local storage: your name, email, role answers and a salted PBKDF2-SHA-256 hash of your password. The password itself is never written to storage, the session expires after seven days, and clearing site data deletes the account. This is not a substitute for server-side authentication.</p></article>
-      <article className="trust-card"><span className="trust-number">06</span><h2>Minors and guardians</h2><p>Teen accounts get protective defaults: candidate discovery off, no public profile, no ads, no engagement feeds, and no targeted messaging from unverified organizations. A parent or guardian can ask to review, correct, or delete a minor’s information at any time.</p></article>
+      <article className="trust-card"><span className="trust-number">05</span><h2>Accounts on this device</h2><p>Until the API is connected, your account is stored in this browser’s local storage: your name, email, role answers, profile fields, consent timestamps and a salted PBKDF2-SHA-256 hash of your password. The password itself is never written to storage, the session expires after seven days, and clearing site data deletes the account. Browser storage can be edited by anyone with access to this device, so it is not a security boundary and not a substitute for server-side authentication.</p></article>
+      <article className="trust-card"><span className="trust-number">06</span><h2>Minors and guardians</h2><p>Teen accounts have candidate discovery off, no public profile and no advertising. Until a guardian confirms, applying to roles, messaging organizations and discovery are locked. Confirmation is not verified automatically yet: no guardian email is sent, so those features stay locked. A parent or guardian can ask to review, correct, or delete a minor’s information at any time.</p></article>
       <article className="trust-card"><span className="trust-number">07</span><h2>How long we keep it</h2><p>Profile, application and message data is kept while the account is active and deleted within 30 days of a verified deletion request, unless a safety investigation or legal obligation requires longer retention. Reports are kept only as long as needed to resolve them.</p></article>
-      <article className="trust-card"><span className="trust-number">08</span><h2>Changes and contact</h2><p>Material changes to this notice will be announced in-product before they take effect. Privacy requests and questions go through the feedback panel until a monitored privacy contact is assigned, which is a launch requirement.</p></article>
+      <article className="trust-card"><span className="trust-number">08</span><h2>Changes and contact</h2><p>Material changes to this notice will be announced in-product before they take effect. A monitored privacy contact has not been assigned yet, so privacy, appeal and deletion requests cannot be submitted through this build: the feedback panel only saves a note on your device. Assigning a staffed contact is a launch requirement.</p></article>
     </div>
 
     <div className="privacy-note"><strong>Not legal advice.</strong><p>This notice reflects published federal and state requirements as of October 2026, including COPPA and the California privacy statutes. Some state child-safety provisions are enjoined or not yet effective. Have counsel review the final policy, retention schedule, and request-handling process before launch.</p><button className="text-link" onClick={() => go('Trust & safety')}>Safety guidance <span className="button-arrow" aria-hidden="true">↗</span></button></div>
