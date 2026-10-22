@@ -103,3 +103,18 @@ test('search, category filter, resources, and moderation disclosure', async ({ p
   await page.getByRole('button', { name: /Moderator review dashboard/ }).click()
   await expect(page.getByText(/This non-authenticated mockup/)).toBeVisible()
 })
+
+
+test('feedback micro-interaction captures a local demo response without claiming it was sent', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Open feedback panel' }).click()
+  const panel = page.getByRole('dialog', { name: 'Help us improve.' })
+  await expect(panel).toBeVisible()
+  const idea = panel.getByRole('button', { name: /Feature idea/ })
+  await idea.click()
+  await expect(idea).toHaveAttribute('aria-pressed', 'true')
+  await panel.getByRole('textbox', { name: 'Optional details' }).fill('Add a way to preview creator profiles.')
+  await panel.getByRole('button', { name: /Submit feedback/ }).click()
+  await expect(panel).not.toBeVisible()
+  await expect(page.getByRole('status')).toContainText('did not send or save your response')
+})
