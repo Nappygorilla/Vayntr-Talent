@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 test('the homepage is the compiled VAYNTR Talent app, not repository documentation', async ({ page }) => {
   await page.goto('/')
   await expect(page).toHaveTitle(/VAYNTR Talent/)
-  await expect(page.getByRole('heading', { name: /Find your place in the game/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Find your next move/i })).toBeVisible()
   await expect(page.getByRole('heading', { name: /^VAYNTR Talent$/i })).toHaveCount(0)
 })
 
@@ -41,7 +41,7 @@ test('quick navigation opens with Ctrl+K and routes to a searched page', async (
 
 test('candidate marketplace journey and organization demo surfaces', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: /Find your place in the game/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Find your next move/i })).toBeVisible()
 
   await page.getByRole('button', { name: 'Explore opportunities' }).first().click()
   await expect(page.getByRole('heading', { name: /Find your next role/i })).toBeVisible()
@@ -122,8 +122,8 @@ test('feedback micro-interaction captures a local demo response without claiming
 
 test('editorial redesign uses open sections instead of placeholder ad blocks and boxed feature cards', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: /Find your place in the game/i })).toBeVisible()
-  await expect(page.locator('.discipline-strip')).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Find your next move/i })).toBeVisible()
+  await expect(page.locator('.home-lane-list')).toBeVisible()
   await expect(page.getByText(/TOP BANNER|LEADERBOARD|SIDEBAR · 300 × 250/)).toHaveCount(0)
   await expect(page.locator('.home-opening-row')).toHaveCount(4)
   await expect(page.locator('.home-process-step')).toHaveCount(3)
