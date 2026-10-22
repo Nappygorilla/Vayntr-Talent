@@ -1,6 +1,6 @@
 # VAYNTR Talent
 
-A Next.js App Router + React + TypeScript demo for a black-and-red esports and creator talent marketplace. The UI preserves the existing VAYNTR Talent demo flows and styling. The app can run as a standard Next.js server or export as a static site for GitHub Pages.
+A Next.js App Router + React + TypeScript frontend for a black-and-red esports and creator talent marketplace. Every organization, role, player and conversation is meant to come from the API: the app ships no seeded accounts, listings, messages or support address, so each surface renders an empty state until the backend is connected. The app can run as a standard Next.js server or export as a static site for GitHub Pages.
 
 ## Run locally
 
@@ -21,30 +21,31 @@ npm run test:e2e
 
 ## Deployment
 
-- **GitHub Pages demo:** the Actions workflow sets `GITHUB_PAGES=true`, builds a static export into `out/`, and publishes that directory under `/Vayntr-Talent/`.
+- **GitHub Pages static export:** the Actions workflow sets `GITHUB_PAGES=true`, builds a static export into `out/`, and publishes that directory under `/Vayntr-Talent/`.
 - **Server deployment:** omit `GITHUB_PAGES=true`, then use `npm run build` and `npm start` on a Next.js-capable host such as Render.
 - Keep GitHub Pages' publishing source set to **GitHub Actions** for the static export workflow to own deployment.
 
-## What this demo includes
+## What this build includes
 
-- Responsive public landing, role marketplace with search/category filters, full sample listing details, organization profile, trust and safety page, and dated educational resources with source links.
-- Clearly labeled **sample/demo listings**. The fictional sample organizations and roles are not real opportunities. The demo-only "Organization checked" badge is an explanation example, not verification.
-- Candidate profile form with private-by-default visibility toggle, application sharing summary, local apply/status/withdraw interactions, export/delete placeholders, and sensitive-data warnings.
-- Organization inbox with local status changes and mocked recruiter/listing-management actions.
-- Listing report dialog, organization block control, and moderator dashboard mockup, with demo-only disclaimers.
-- Clearly reserved future ad inventory areas. **No ad network, ad scripts, tracking, sponsored placements, or ad targeting are installed.** Keep ads out of applications, private profiles, candidate data, and audience targeting. Establish audience age policy, consent and privacy reviews before any future advertising.
+- Responsive public landing, role marketplace with search/category filters, listing detail, organization directory, player directory, messages, trust and safety page, and dated educational resources with source links.
+- Two-sided marketplace: **players looking for an org** and **orgs looking for players**, each gated by that game's own competition age floor. Salary is stated on both sides — a player's ask and the organization's offer with its pay terms.
+- **No invented records.** Organizations, roles, players and conversations are typed empty stores in the client until the API fills them. Empty states say plainly that nothing is loaded on this device instead of showing sample people or companies.
+- Candidate profile form with private-by-default visibility toggle, per-application sharing summary, and sensitive-data warnings. Saves stay in page memory and reset on reload.
+- Organization workspace requires a real organization account; without one it says so instead of rendering a mock dashboard.
+- Report dialog, feedback panel and moderator queue exist as UI. Their copy states that a report or note is saved on this device — it does not claim to have reached moderators or the product team.
+- Reserved future ad inventory. **No ad network, ad scripts, tracking, sponsored placements, or ad targeting are installed.** Keep ads out of applications, private profiles, candidate data, and audience targeting. Establish audience age policy, consent and privacy reviews before any future advertising.
 - Responsive semantic controls, labels, keyboard focus treatment, reduced-motion support, and empty states.
 
 ## Critical implementation limits
 
-This is a **front-end-only demonstration**, not a live or launch-ready recruitment marketplace:
+This is a **front-end-only build**, not a live or launch-ready recruitment marketplace:
 
-- There is no authentication, server, database, account system, authorization, secure session, persistence, or organization membership. Candidate and organization demo state is held only in page memory. It resets on reload. The browser and UI do not enforce access controls; do not put real profile or application data into this demo.
-- Apply, withdraw, reporting, blocking, status changes, exports/deletion, recruiter invites, moderation actions, appeals and support are simulated. They do not contact an organization, delete/export server records, alert a moderator, or create an audit trail.
+- There is no authentication, server, database, account system, authorization, secure session, persistence, or organization membership. Candidate, organization, message and application state is held only in page memory. It resets on reload. The browser and UI do not enforce access controls; do not put real profile or application data into this demo.
+- Apply, withdraw, reporting, blocking, status changes, exports/deletion, recruiter invites, moderation actions, appeals and support are not connected to a backend. They do not contact an organization, delete/export server records, alert a moderator, or create an audit trail, and the interface no longer suggests otherwise.
 - No real organization or individual has been verified. A future verification label must state exact checks and dates; neither org nor identity verification guarantees role safety, legitimacy, or VAYNTR endorsement.
-- Support address is a placeholder (`support@vayntr.example`). Replace only after assigning a monitored support owner and escalation process.
+- **No support address is wired.** The "Contact support" control opens the feedback panel until a monitored support owner and escalation process are assigned.
 - There are no real listings, testimonials, endorsements, users, or performance claims. Educational guidance is cautiously framed, reviewed October 22, 2026, and linked to its sources. Platform-specific guidance may change; re-review sources before launch.
-- Age is a **launch decision**. This demo models an adults-only marketplace (18+) while public educational pages may be viewed by anyone. An age dropdown is not robust age assurance. Do not allow minors to create marketplace accounts/apply until a separate guardian-involved process, contact protections, limited visibility, and legal/privacy review are implemented. Do not collect personal data through the marketplace from children under 13.
+- Age is a **launch decision**. Floor ages follow each scene's published competition rules (Rocket League, Fortnite and Street Fighter 13+; Apex, CS2 and EA SPORTS FC 16+; League of Legends and Overwatch 17+; VALORANT, Warzone, Rainbow Six and Tekken 18+), and a stored age gates applying and contacting. An age input is not robust age assurance. Do not allow minors to create marketplace accounts/apply until a separate guardian-involved process, contact protections, limited visibility, and legal/privacy review are implemented. Do not collect personal data through the marketplace from children under 13.
 - Candidate discovery is off by default in the demo, but the form toggle is not a privacy boundary. A production system must only expose opted-in profiles to authenticated/approved organizations and let candidates turn discovery off promptly.
 - Future listing forms must enforce all role, compensation, hours, location, eligibility, experience, responsibilities, application process, posting and expiry fields; prohibit fees, required purchases, misleading compensation and requests for credentials/sensitive documents. Applications must be initiated by the candidate and communicate through a controlled platform flow.
 

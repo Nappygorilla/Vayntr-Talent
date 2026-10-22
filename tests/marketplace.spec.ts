@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test'
 
+// Every organization, player, conversation and address the app used to invent.
+// None of them may appear in the shipped markup or in any rendered page.
+const fabricated = /Northstar|PixelForge|Arcadia|Mika Sato|Dante Cruz|Nadia Ferreira|Owen Blake|Ivy Chen|Rafael Moreno|vayntr\.example|sample role|\bdemo\b/i
+
+const destinations = ['Marketplace', 'Players', 'Organizations', 'Messages', 'Resources', 'Trust & safety', 'For organizations', 'My profile', 'Applications']
+
 test('the homepage is the compiled VAYNTR Talent app, not repository documentation', async ({ page }) => {
   await page.goto('/')
   await expect(page).toHaveTitle(/VAYNTR Talent/)
@@ -39,89 +45,88 @@ test('quick navigation opens with Ctrl+K and routes to a searched page', async (
   await expect(page.getByRole('heading', { name: /A useful VOD review starts with a question/i })).toBeVisible()
 })
 
-test('the marketplace offers both sides of the market', async ({ page }) => {
+test('both sides of the market exist and start empty instead of showing invented records', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: /I.m a player/i }).click()
   await expect(page.getByRole('heading', { name: /Players open to offers/i })).toBeVisible()
   await expect(page.getByRole('tab', { name: /Players looking for an org/i })).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByRole('tab', { name: /Orgs looking for players/i })).toHaveAttribute('aria-selected', 'false')
+  await expect(page.getByRole('heading', { name: 'No players are listed yet' })).toBeVisible()
+  await expect(page.locator('.player-card')).toHaveCount(0)
 
   await page.getByRole('tab', { name: /Orgs looking for players/i }).click()
   await expect(page.getByRole('heading', { name: /Find your next role/i })).toBeVisible()
-  await expect(page.getByText('5 open roles')).toBeVisible()
-  await expect(page.locator('.listing-card').first().locator('.listing-pay')).toContainText('SALARY')
+  await expect(page.getByText('0 open roles')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No roles are open right now' })).toBeVisible()
+  await expect(page.locator('.listing-card')).toHaveCount(0)
 })
 
-test('applying respects the game age policy on the listing', async ({ page }) => {
+test('no page or shipped markup contains invented accounts, roles or conversations', async ({ page }) => {
+  const html = await (await page.request.get('/')).text()
+  expect(html).not.toMatch(fabricated)
+  expect(html).not.toContain('mailto:')
+
   await page.goto('/')
-  await page.getByRole('button', { name: /Explore roles/ }).click()
-  await page.getByPlaceholder('Role, organization, or game').fill('editor')
-  await expect(page.getByRole('heading', { name: 'Short-form Video Editor' })).toBeVisible()
-  await page.getByRole('button', { name: 'View details' }).click()
-  // The org's salary for the position is stated up front, next to its pay terms.
-  await expect(page.locator('.detail-highlight')).toContainText('SALARY')
-  await expect(page.locator('.detail-highlight')).toContainText('25–35 USD / hour')
-  await expect(page.getByText('Paid freelance, invoiced monthly. The test edit is paid at the agreed rate.')).toBeVisible()
-  await expect(page.getByText(/Posted Oct 20, 2026 · Expires Nov 19, 2026/)).toBeVisible()
-
-  // No age saved yet: the apply action is gated.
-  await expect(page.getByRole('button', { name: '16+ required' })).toBeDisabled()
-  await page.getByRole('button', { name: 'Open profile' }).click()
-  await page.getByRole('spinbutton', { name: 'Age' }).fill('20')
-  await page.getByRole('button', { name: 'Save profile' }).click()
-  await expect(page.getByRole('status')).toContainText('Profile saved')
-
-  await page.getByRole('button', { name: /Explore roles/ }).click()
-  await page.getByRole('button', { name: 'View details' }).click()
-  await page.getByRole('button', { name: 'Apply through platform' }).click()
-  await expect(page.getByRole('status')).toContainText('Application recorded')
-
-  await page.getByRole('button', { name: 'Report listing' }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await page.getByRole('button', { name: 'Submit report' }).click()
-  await expect(page.getByRole('status')).toContainText('Report received')
-
-  await page.getByRole('button', { name: 'Block organization' }).click()
-  await expect(page.getByRole('button', { name: 'Unblock organization' })).toBeVisible()
-  await page.getByRole('button', { name: 'Unblock organization' }).click()
-  await expect(page.getByRole('button', { name: 'Block organization' })).toBeVisible()
+  for (const destination of destinations) {
+    await page.locator('footer').getByRole('button', { name: destination, exact: true }).click()
+    await expect(page.locator('.page-wrap, .hero').first()).toBeVisible()
+    expect(await page.locator('body').innerText()).not.toMatch(fabricated)
+    await expect(page.locator('.player-card, .listing-card, .thread-item, .org-directory-card')).toHaveCount(0)
+  }
 })
 
-test('a player can message an organization from a role', async ({ page }) => {
+test('the organization workspace asks for a real account instead of using a made-up organization', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: /Explore roles/ }).click()
-  await page.getByRole('button', { name: 'View details' }).first().click()
-  await page.getByRole('button', { name: 'Message organization' }).click()
-
-  await expect(page.getByRole('heading', { name: /Talk it/i })).toBeVisible()
-  await expect(page.getByRole('log')).toBeVisible()
-  await page.getByRole('textbox', { name: 'Message' }).fill('Could we talk about the trial dates?')
-  await page.getByRole('button', { name: /^Send/ }).click()
-  await expect(page.getByRole('log')).toContainText('trial dates')
-})
-
-test('orgs can find players and message them in the workspace inbox', async ({ page }) => {
-  await page.goto('/')
-  await page.getByRole('button', { name: /I.m a player/i }).click()
-
-  const mika = page.locator('.player-card').filter({ hasText: 'Mika Sato' })
-  const warzone = page.locator('.player-card').filter({ hasText: 'Dante Cruz' })
-  // Rocket League allows 13+, so a 14-year-old can be signed; Warzone requires 18+.
-  await expect(mika.getByRole('button', { name: 'Message player' })).toBeEnabled()
-  await expect(warzone.getByRole('button', { name: 'Message player' })).toBeDisabled()
-  await expect(warzone.getByText(/Below the Call of Duty/i)).toBeVisible()
-  // Players state the salary they are looking for, and orgs state what they pay.
-  await expect(mika.locator('.player-pay')).toContainText('SALARY ASK')
-  await expect(mika.locator('.player-pay')).toContainText('300–500 USD / month')
-
-  await mika.getByRole('button', { name: 'Message player' }).click()
+  await page.locator('footer').getByRole('button', { name: 'For organizations', exact: true }).click()
   await expect(page.getByRole('heading', { name: /Build your team/i })).toBeVisible()
-  await expect(page.locator('.thread-peer')).toContainText('Mika Sato')
-  await page.getByRole('textbox', { name: 'Message' }).fill('Can your guardian join a call on Thursday?')
-  await page.getByRole('button', { name: /^Send/ }).click()
-  await expect(page.getByRole('log')).toContainText('guardian join a call')
+  await expect(page.getByRole('heading', { name: 'No organization account yet' })).toBeVisible()
+  await expect(page.locator('.dashboard-stats')).toHaveCount(0)
+  await expect(page.getByText(/Northstar/i)).toHaveCount(0)
+})
 
-  await expect(page.getByRole('button', { name: /Inbox/ })).toBeVisible()
+test('the organization directory and player inbox have empty states', async ({ page }) => {
+  await page.goto('/')
+  await page.locator('footer').getByRole('button', { name: 'Organizations', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'No organizations listed yet' })).toBeVisible()
+
+  await page.getByRole('button', { name: /Inbox/ }).click()
+  await expect(page.getByRole('heading', { name: 'No conversations yet' })).toBeVisible()
+})
+
+test('age guidance covers every supported game', async ({ page }) => {
+  await page.goto('/')
+  await page.locator('footer').getByRole('button', { name: 'Trust & safety', exact: true }).click()
+  await expect(page.getByRole('heading', { name: /Every scene sets/i })).toBeVisible()
+  await expect(page.locator('.age-row')).toHaveCount(12)
+  await expect(page.locator('.age-row').filter({ hasText: 'Rocket League' })).toContainText('13+')
+  await expect(page.locator('.age-row').filter({ hasText: 'Call of Duty' })).toContainText('18+')
+})
+
+test('the moderation queue is empty instead of listing invented cases', async ({ page }) => {
+  await page.goto('/')
+  await page.locator('footer').getByRole('button', { name: 'Trust & safety', exact: true }).click()
+  await page.getByRole('button', { name: /Moderator review dashboard/ }).click()
+  await expect(page.getByRole('heading', { name: 'No reports in the queue' })).toBeVisible()
+  await expect(page.locator('.mod-case')).toHaveCount(0)
+})
+
+test('the profile saves the age locally and says so', async ({ page }) => {
+  await page.goto('/')
+  await page.locator('footer').getByRole('button', { name: 'My profile', exact: true }).click()
+  await page.getByRole('spinbutton', { name: 'Age' }).fill('17')
+  await page.getByRole('button', { name: 'Save profile' }).click()
+  await expect(page.getByRole('status')).toContainText('Profile saved on this device')
+  await expect(page.getByRole('button', { name: 'Delete account' })).toHaveCount(0)
+})
+
+test('reporting a listing does not claim to reach moderators', async ({ page }) => {
+  await page.goto('/')
+  await page.locator('footer').getByRole('button', { name: 'Trust & safety', exact: true }).click()
+  await page.getByRole('button', { name: 'Report a listing or account' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('Reports are saved on this device')
+  await dialog.getByRole('button', { name: 'Submit report' }).click()
+  await expect(page.getByRole('status')).toContainText('Report saved on this device')
 })
 
 test('feedback shows an in-place confirmation after submitting', async ({ page }) => {
@@ -135,30 +140,23 @@ test('feedback shows an in-place confirmation after submitting', async ({ page }
   await panel.getByRole('textbox', { name: 'Optional details' }).fill('Add a way to preview creator profiles.')
   await panel.getByRole('button', { name: /Submit feedback/ }).click()
   await expect(panel.getByRole('heading', { name: /Got it/i })).toBeVisible()
-  await expect(page.getByRole('status')).toContainText('Feedback received')
+  await expect(page.getByRole('status')).toContainText('Feedback saved on this device')
 })
 
-test('age guidance covers every supported game', async ({ page }) => {
-  await page.goto('/')
-  await page.getByRole('button', { name: /Trust & safety|Trust &amp; safety/ }).first().click()
-  await expect(page.getByRole('heading', { name: /Every scene sets/i })).toBeVisible()
-  await expect(page.locator('.age-row')).toHaveCount(12)
-  await expect(page.locator('.age-row').filter({ hasText: 'Rocket League' })).toContainText('13+')
-  await expect(page.locator('.age-row').filter({ hasText: 'Call of Duty' })).toContainText('18+')
-})
-
-test('home page uses the redesigned surfaces instead of placeholder ad blocks', async ({ page }) => {
+test('home page uses the redesigned surfaces and only previews real roles', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Find your place in the game/i })).toBeVisible()
   await expect(page.locator('.discipline-track')).toBeVisible()
   await expect(page.getByText(/TOP BANNER|LEADERBOARD|SIDEBAR · 300 × 250/)).toHaveCount(0)
   await expect(page.locator('.hero-visual .float-card')).toHaveCount(2)
-  await expect(page.locator('.home-role')).toHaveCount(3)
   await expect(page.locator('.path-card')).toHaveCount(2)
+  // No roles are loaded, so the homepage role preview is not rendered at all.
+  await expect(page.locator('.home-role')).toHaveCount(0)
   const feature = page.locator('.feature-card').first()
   await expect(feature).toHaveCSS('border-radius', '20px')
   await expect(feature).toHaveCSS('border-top-width', '1px')
+
   await page.getByRole('button', { name: /Explore roles/ }).click()
-  const listing = page.locator('.listing-card').first()
-  await expect(listing).toHaveCSS('border-radius', '18px')
+  await expect(page.locator('.empty-state')).toBeVisible()
+  await expect(page.locator('.empty-state')).toHaveCSS('border-radius', '20px')
 })
