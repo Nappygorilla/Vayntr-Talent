@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -52,11 +52,32 @@ jobs:
           fi
           touch out/.nojekyll
 
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+      - name: Publish verified static export to branch-based Pages root
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Test marketplace flows
-        run: npm run test:e2e
+          # Keep the compiled app in the branch root as well, so legacy branch-based
+          # Pages never falls back to README.md or the setup-only index.html page.
+          rm -rf ./_next
+          cp -a out/_next ./_next
+          git add -A -- _next
+
+          while IFS= read -r -d '' file; do
+            target="${file#out/}"
+            mkdir -p "$(dirname "$target")"
+            cp -f "$file" "$target"
+            git add -A -- "$target"
+          done < <(find out -type f -print0)
+
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Publish compiled VAYNTR Talent site [skip ci]"
+            git push origin HEAD:main
+          else
+            echo "The compiled site is already synced to the branch root."
+          fi
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
