@@ -1,4 +1,7 @@
-:HL["/Vayntr-Talent/_next/static/chunks/1g-cg6kofvebh.css","style"]
-:HL["https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap","style"]
+:HL["/Vayntr-Talent/_next/static/chunks/3ubs8e-2o901u.css","style"]
+:HL["/Vayntr-Talent/_next/static/media/017d9bea37084d9b-s.p.41rroleoq1br7.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/Vayntr-Talent/_next/static/media/36363bfb06833f56-s.p.38hmww4cj4vme.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/Vayntr-Talent/_next/static/media/a343f882a40d2cc9-s.p.1sj6eobyi31rd.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/Vayntr-Talent/_next/static/media/a73419dd2ba2d841-s.p.2yee423r7ahpo.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 1:[["children",{"s":"__PAGE__","h":160}]]
-0:{"b":"z0V8RCpD94fjFWEj7omil","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
+0:{"b":"vrLTLdBTbthdYX219czkL","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
