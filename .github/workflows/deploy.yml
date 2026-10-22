@@ -36,6 +36,22 @@ jobs:
         env:
           GITHUB_PAGES: 'true'
 
+      - name: Verify export cannot publish the README
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s out/index.html
+          if ! grep -q 'Find your place' out/index.html; then
+            echo 'Expected the compiled VAYNTR Talent homepage in out/index.html.'
+            exit 1
+          fi
+          readme_file="$(find out -type f \\( -iname 'README.md' -o -iname 'README.html' \\) -print -quit)"
+          if [ -n "$readme_file" ]; then
+            echo "README files are not allowed in the published artifact: $readme_file"
+            exit 1
+          fi
+          touch out/.nojekyll
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 

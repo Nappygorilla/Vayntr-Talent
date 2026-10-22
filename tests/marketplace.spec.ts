@@ -1,3 +1,11 @@
+
+test('the homepage is the compiled VAYNTR Talent app, not repository documentation', async ({ page }) => {
+  await page.goto('/')
+  await expect(page).toHaveTitle(/VAYNTR Talent/)
+  await expect(page.getByRole('heading', { name: /Find your place in the game/i })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /^VAYNTR Talent$/i })).toHaveCount(0)
+})
+
 import { expect, test } from '@playwright/test'
 
 test('button arrows rotate right on hover and return when the pointer leaves', async ({ page }) => {
