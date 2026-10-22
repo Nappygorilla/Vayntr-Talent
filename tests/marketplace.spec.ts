@@ -1,5 +1,18 @@
 import { expect, test } from '@playwright/test'
 
+test('button arrows rotate right on hover and return when the pointer leaves', async ({ page }) => {
+  await page.goto('/')
+  const button = page.getByRole('button', { name: /Explore opportunities/ }).first()
+  const arrow = button.locator('.button-arrow')
+
+  await expect(arrow).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)')
+  await button.hover()
+  await expect(arrow).toHaveCSS('transform', /matrix\(0\.707/)
+
+  await page.mouse.move(0, 0)
+  await expect(arrow).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)')
+})
+
 test('candidate marketplace journey and organization demo surfaces', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Find your place in the game/i })).toBeVisible()
