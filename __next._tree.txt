@@ -1,4 +1,4 @@
 :HL["/Vayntr-Talent/_next/static/chunks/2l7oq_w8y6paf.css","style"]
 :HL["https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap","style"]
 1:[["children",{"s":"__PAGE__","h":160}]]
-0:{"b":"I3mTsYlKsickZnkRo_tkn","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
+0:{"b":"COup37n9KkRht-GAmfTyY","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
