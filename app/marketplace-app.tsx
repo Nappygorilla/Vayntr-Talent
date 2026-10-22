@@ -21,6 +21,18 @@ const listings: Listing[] = [
 ]
 const statusOptions = ['Received', 'In review', 'Interview', 'Not selected', 'Withdrawn']
 
+const commandActions = [
+  { page: 'Home', label: 'Home', description: 'Return to the landing page', keywords: 'start landing overview', icon: '⌂' },
+  { page: 'Marketplace', label: 'Marketplace', description: 'Search sample roles and opportunities', keywords: 'jobs roles listings search', icon: '⌕' },
+  { page: 'Organizations', label: 'Organizations', description: 'Browse the sample organization directory', keywords: 'teams companies directory', icon: '◈' },
+  { page: 'Resources', label: 'Resources', description: 'Open competitive and creator guides', keywords: 'guides articles learning', icon: '↗' },
+  { page: 'Trust & safety', label: 'Trust & safety', description: 'Review safety guidance and reporting', keywords: 'privacy report safe support', icon: '◇' },
+  { page: 'For organizations', label: 'For organizations', description: 'View the organization workspace demo', keywords: 'recruiters inbox dashboard', icon: '▤' },
+  { page: 'My profile', label: 'My profile', description: 'Edit your local demo profile', keywords: 'candidate settings visibility', icon: '◎' },
+  { page: 'Applications', label: 'Applications', description: 'Review and withdraw demo applications', keywords: 'candidate status withdraw', icon: '↳' },
+  { page: 'Moderation', label: 'Moderator dashboard', description: 'View the moderation interface mockup', keywords: 'staff reports cases', icon: '▦' },
+]
+
 function App() {
   const [page, setPage] = useState('Home')
   const [query, setQuery] = useState('')
@@ -34,17 +46,37 @@ function App() {
   const [blocked, setBlocked] = useState<string[]>([])
   const [reportOpen, setReportOpen] = useState(false)
   const [mobileMenu, setMobileMenu] = useState(false)
+  const [commandOpen, setCommandOpen] = useState(false)
+  const [commandQuery, setCommandQuery] = useState('')
+  const [commandSelection, setCommandSelection] = useState(0)
   const categories = ['All roles', ...new Set(listings.map((item) => item.category))]
   useEffect(() => {
     const navigate = (event: Event) => { const next = (event as CustomEvent<string>).detail; setPage(next); setSelected(null); setSelectedOrg(null); setMobileMenu(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }
     window.addEventListener('navigate-page', navigate)
     return () => window.removeEventListener('navigate-page', navigate)
   }, [])
+  useEffect(() => {
+    const handleQuickNavigation = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setCommandOpen((open) => !open)
+        setCommandQuery('')
+        setCommandSelection(0)
+      }
+      if (event.key === 'Escape') setCommandOpen(false)
+    }
+    window.addEventListener('keydown', handleQuickNavigation)
+    return () => window.removeEventListener('keydown', handleQuickNavigation)
+  }, [])
   const filtered = useMemo(() => listings.filter((item) => {
     const matchText = `${item.title} ${item.org} ${item.game} ${item.category}`.toLowerCase().includes(query.toLowerCase())
     return matchText && (category === 'All roles' || item.category === category) && !blocked.includes(item.org)
   }), [query, category, blocked])
-  function go(next: string) { setPage(next); setSelected(null); setSelectedOrg(null); setMobileMenu(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  const matchingCommands = useMemo(() => {
+    const normalized = commandQuery.trim().toLowerCase()
+    return commandActions.filter((action) => `${action.label} ${action.description} ${action.keywords}`.toLowerCase().includes(normalized))
+  }, [commandQuery])
+  function go(next: string) { setPage(next); setSelected(null); setSelectedOrg(null); setMobileMenu(false); setCommandOpen(false); setCommandQuery(''); setCommandSelection(0); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   function apply(item: Listing, shared: string[]) {
     if (!applications.some((application) => application.listingId === item.id)) setApplications([...applications, { listingId: item.id, status: 'Received', shared }])
     setNotice(`Demo application recorded for ${item.title}. This is local sample state only; no organization was contacted.`)
@@ -58,9 +90,11 @@ function App() {
       <a className="brand" href="#home" onClick={(event) => { event.preventDefault(); go('Home') }} aria-label="VAYNTR Talent home"><span className="brand-symbol">V<span>.</span></span><span className="brand-text">VAYNTR<span>TALENT</span></span></a>
       <button className="menu-button" aria-label="Toggle navigation" aria-expanded={mobileMenu} aria-controls="primary-nav" onClick={() => setMobileMenu(!mobileMenu)}>☰</button>
       <nav id="primary-nav" className={mobileMenu ? 'nav open' : 'nav'} aria-label="Main navigation">{pages.slice(0, 4).map((item) => <button key={item} className={page === item ? 'nav-item active' : 'nav-item'} onClick={() => go(item)}>{item}</button>)}</nav>
+      <button className="command-trigger" type="button" aria-label="Open quick navigation (Ctrl or Command plus K)" aria-keyshortcuts="Control+K Meta+K" onClick={() => { setCommandQuery(''); setCommandSelection(0); setCommandOpen(true) }}><span className="command-trigger-icon" aria-hidden="true">⌕</span><span className="command-trigger-label">Quick jump</span><kbd>Ctrl K</kbd></button>
       <div className="header-actions"><button className="signin" onClick={() => go('My profile')}>Sign in <span className="demo-tag">DEMO</span></button><button className="button button-red button-small" onClick={() => go('Marketplace')}>Explore roles <span className="button-arrow" aria-hidden="true">↗</span></button></div>
     </header>
     {notice && <div className="notice" role="status"><span>{notice}</span><button aria-label="Dismiss message" onClick={() => setNotice('')}>×</button></div>}
+    {commandOpen && <div className="command-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCommandOpen(false) }}><section className="command-palette" role="dialog" aria-modal="true" aria-labelledby="command-title"><h2 id="command-title" className="sr-only">Quick navigation</h2><div className="command-search-row"><span className="command-search-icon" aria-hidden="true">⌕</span><input autoFocus aria-label="Search pages and actions" role="combobox" aria-controls="quick-nav-results" aria-expanded="true" value={commandQuery} onChange={(event) => { setCommandQuery(event.target.value); setCommandSelection(0) }} onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setCommandSelection((current) => matchingCommands.length ? (current + 1) % matchingCommands.length : 0) } else if (event.key === 'ArrowUp') { event.preventDefault(); setCommandSelection((current) => matchingCommands.length ? (current - 1 + matchingCommands.length) % matchingCommands.length : 0) } else if (event.key === 'Enter') { event.preventDefault(); const action = matchingCommands[commandSelection]; if (action) go(action.page) } }} placeholder="Jump to a page or workspace…" /><kbd className="command-escape">ESC</kbd></div><div id="quick-nav-results" className="command-results" role="listbox" aria-label="Navigation results">{matchingCommands.map((action, index) => <button key={action.page} id={`quick-nav-option-${index}`} type="button" role="option" aria-selected={index === commandSelection} className={index === commandSelection ? 'command-option selected' : 'command-option'} onMouseEnter={() => setCommandSelection(index)} onClick={() => go(action.page)}><span className="command-option-icon" aria-hidden="true">{action.icon}</span><span className="command-option-copy"><strong>{action.label}</strong><small>{action.description}</small></span><kbd>↵</kbd></button>)}</div>{matchingCommands.length === 0 && <div className="command-empty">No matching page. Try a shorter search.</div>}<div className="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> Move</span><span><kbd>Enter</kbd> Open</span><span><kbd>Esc</kbd> Close</span></div></section></div>}
     {page === 'Home' && <HomePage go={go} />}
     {page === 'Marketplace' && <Marketplace query={query} setQuery={setQuery} category={category} setCategory={setCategory} categories={categories} filtered={filtered} onSelect={setSelected} selected={selected} apply={apply} applications={applications} onReport={() => setReportOpen(true)} blocked={blocked} setBlocked={setBlocked} go={go} />}
     {page === 'Organizations' && <OrganizationsPage go={go} selectOrg={(name) => { setSelectedOrg(name); setPage('Organization detail') }} />}

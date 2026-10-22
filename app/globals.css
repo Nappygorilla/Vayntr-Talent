@@ -254,4 +254,38 @@ button:disabled {
 .button-arrow { display: inline-block; transform: rotate(0deg) translateX(0); transform-origin: center; transition: transform 220ms cubic-bezier(.2, .7, .2, 1); }
 button:hover .button-arrow, button:focus-visible .button-arrow { transform: translateX(2px) rotate(45deg); }
 
+
+/* Quick navigation and tactile, accessible micro-interactions inspired by modern UI component libraries. */
+.command-trigger { display: inline-flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid #303035; background: #111113; color: #aaaab0; cursor: pointer; font-size: 10px; white-space: nowrap; transition: border-color 180ms ease, color 180ms ease, box-shadow 180ms ease; }
+.command-trigger:hover { color: #f5f5f6; border-color: #654045; box-shadow: 0 0 0 3px #e01e2910; }
+.command-trigger-icon { color: #f15b64; font-size: 16px; line-height: 1; }
+.command-trigger kbd, .command-search-row kbd, .command-option kbd, .command-footer kbd { padding: 3px 5px; border: 1px solid #37373d; background: #1b1b1f; color: #a8a8af; font: 9px 'DM Mono', monospace; white-space: nowrap; }
+.command-backdrop { position: fixed; z-index: 60; inset: 0; display: flex; justify-content: center; align-items: flex-start; padding: min(17vh, 132px) 18px 18px; background: rgba(3, 3, 5, .76); backdrop-filter: blur(9px); animation: command-backdrop-in 160ms ease both; }
+.command-palette { width: min(560px, 100%); overflow: hidden; border: 1px solid #493034; background: #111113; box-shadow: 0 26px 90px #000b, 0 0 55px #e01e2912; animation: command-palette-in 190ms cubic-bezier(.2, .75, .25, 1) both; }
+.command-search-row { display: flex; align-items: center; gap: 11px; padding: 15px 16px; border-bottom: 1px solid #2d2b30; }
+.command-search-icon { color: #ff6971; font-size: 23px; line-height: 1; }
+.command-search-row input { flex: 1; min-width: 0; border: 0; outline: 0; color: #f2f2f4; background: transparent; font-size: 13px; }
+.command-search-row input::placeholder { color: #777780; }
+.command-results { display: flex; flex-direction: column; gap: 3px; padding: 7px; max-height: min(54vh, 420px); overflow-y: auto; }
+.command-option { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 11px; width: 100%; padding: 10px 11px; border: 1px solid transparent; text-align: left; color: #dedee2; cursor: pointer; background: transparent; transition: background 160ms ease, border-color 160ms ease, transform 160ms ease; }
+.command-option:hover, .command-option.selected { border-color: #47282c; background: linear-gradient(100deg, #281619, #171316 70%, #131214); }
+.command-option.selected { transform: translateX(2px); }
+.command-option-icon { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #48282d; color: #ff737b; background: #1e1316; font-size: 16px; }
+.command-option-copy { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.command-option-copy strong { font-size: 11px; font-weight: 650; }
+.command-option-copy small { overflow: hidden; color: #8e8e97; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.command-empty { padding: 28px 18px; text-align: center; color: #92929a; font-size: 11px; }
+.command-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 10px 14px; border-top: 1px solid #29292e; color: #8d8d95; font-size: 9px; }
+.command-footer span { display: inline-flex; align-items: center; gap: 4px; }
+@keyframes command-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes command-palette-in { from { opacity: 0; transform: translateY(-8px) scale(.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.button:focus-visible, .text-link:focus-visible, .command-trigger:focus-visible { outline: 2px solid #ff6168; outline-offset: 3px; box-shadow: 0 0 0 5px #e01e2914; }
+.button-red:hover:not(:disabled) { box-shadow: 0 8px 24px #e01e293b; }
+.button-outline:hover { box-shadow: 0 0 0 3px #e01e2912; }
+.feature-card, .org-directory-card, .resource-card, .guide-card, .trust-card { transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .feature-card:hover, .org-directory-card:hover, .resource-card:hover, .guide-card:hover, .trust-card:hover { transform: translateY(-3px); border-color: #654045; box-shadow: 0 14px 34px #0004; }
+}
+@media (max-width: 680px) { .command-trigger { display: none; } .command-backdrop { padding: 12vh 12px 12px; } .command-footer { gap: 9px; } }
+
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }

@@ -13,6 +13,23 @@ test('button arrows rotate right on hover and return when the pointer leaves', a
   await expect(arrow).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)')
 })
 
+
+test('quick navigation opens with Ctrl+K and routes to a searched page', async ({ page }) => {
+  await page.goto('/')
+  await page.keyboard.press('Control+k')
+  const dialog = page.getByRole('dialog', { name: 'Quick navigation' })
+  await expect(dialog).toBeVisible()
+
+  const search = page.getByRole('combobox', { name: 'Search pages and actions' })
+  await search.fill('resources')
+  const resourceOption = page.getByRole('option', { name: /Resources/ })
+  await expect(resourceOption).toBeVisible()
+  await search.press('Enter')
+
+  await expect(dialog).not.toBeVisible()
+  await expect(page.getByRole('heading', { name: /A useful VOD review starts with a question/i })).toBeVisible()
+})
+
 test('candidate marketplace journey and organization demo surfaces', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Find your place in the game/i })).toBeVisible()
