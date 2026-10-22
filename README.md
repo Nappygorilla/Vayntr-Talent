@@ -30,8 +30,10 @@ npm run test:e2e
 - Responsive public landing, role marketplace with search/category filters, listing detail, organization directory, player directory, messages, trust and safety page, and dated educational resources with source links.
 - Two-sided marketplace: **players looking for an org** and **orgs looking for players**, each gated by that game's own competition age floor. Salary is stated on both sides — a player's ask and the organization's offer with its pay terms.
 - **No invented records.** Organizations, roles, players and conversations are typed empty stores in the client until the API fills them. Empty states say plainly that nothing is loaded on this device instead of showing sample people or companies.
-- **Free signup for everyone 13 and older**, with no invitation, approval queue or payment. A four-step flow asks first whether you are a player, a content creator or an esports organization, then account details, role-specific questions, and a consent step. Accounts exist on the device only until the API lands.
-- Candidate profile form with private-by-default visibility toggle, per-application sharing summary, and sensitive-data warnings. Saves stay in page memory and reset on reload.
+- **Free signup and log in for everyone 13 and older**, with no invitation, approval queue or payment. A four-step flow asks first whether you are a player, a content creator or an esports organization, then account details, role-specific questions, and a consent step. Accounts work on this device: sign up, log out, and sign back in with the same email and password, including after a reload.
+- **Credential handling you can inspect.** Passwords are never stored as text: each account keeps a random 16-byte salt and a PBKDF2-HMAC-SHA-256 hash at 600,000 iterations, compared in constant time. Sessions expire after seven days, "keep me signed in" can be turned off so the session ends with the tab, five failed attempts pause sign-in for 30 seconds, and unknown emails cost the same derivation time so response timing does not reveal who has an account.
+- **Account management that matches the privacy notice.** The profile page exports the account and profile as JSON, deletes the account after an explicit confirmation (removing its hash and session), and signs out cleanly. Profile edits are written back to the account.
+- Candidate profile form with private-by-default visibility toggle, per-application sharing summary, and sensitive-data warnings. Saves stay in page memory and reset on reload when you are not signed in.
 - Organization workspace requires a real organization account; a signed-in organization gets its own workspace header, and without one the page says so instead of rendering a mock dashboard.
 - A US privacy notice covering what is collected, the no-sale/no-tracking position, retention, minors, and the access, correction, deletion, opt-out, limited-use, non-discrimination, authorized-agent and appeal rights of CCPA/CPRA and other state laws.
 - Report dialog, feedback panel and moderator queue exist as UI. Their copy states that a report or note is saved on this device — it does not claim to have reached moderators or the product team.
@@ -42,14 +44,15 @@ npm run test:e2e
 
 This is a **front-end-only build**, not a live or launch-ready recruitment marketplace:
 
-- There is no authentication, server, database, account system, authorization, secure session, persistence, or organization membership. Candidate, organization, message and application state is held only in page memory. It resets on reload. The browser and UI do not enforce access controls; do not put real profile or application data into this demo.
+- **Authentication is client-side only.** There is no server, database, email delivery or authorization. Credentials live in this browser's storage, so anyone with access to the device or its developer tools can read or edit the account list. The PBKDF2 hash protects a password from casual inspection; it cannot enforce access control, rate limits across sessions, or account recovery. Move authentication to the API before real use.
+- Candidate, organization, message and application state is held only in page memory and resets on reload. The browser and UI do not enforce access controls; do not put real profile or application data into this build.
 - Apply, withdraw, reporting, blocking, status changes, exports/deletion, recruiter invites, moderation actions, appeals and support are not connected to a backend. They do not contact an organization, delete/export server records, alert a moderator, or create an audit trail, and the interface no longer suggests otherwise.
 - No real organization or individual has been verified. A future verification label must state exact checks and dates; neither org nor identity verification guarantees role safety, legitimacy, or VAYNTR endorsement.
 - **No support address is wired.** The "Contact support" control opens the feedback panel until a monitored support owner and escalation process are assigned.
 - There are no real listings, testimonials, endorsements, users, or performance claims. Educational guidance is cautiously framed, reviewed October 22, 2026, and linked to its sources. Platform-specific guidance may change; re-review sources before launch.
 - Age is a **launch decision**. Floor ages follow each scene's published competition rules (Rocket League, Fortnite and Street Fighter 13+; Apex, CS2 and EA SPORTS FC 16+; League of Legends and Overwatch 17+; VALORANT, Warzone, Rainbow Six and Tekken 18+), and a stored age gates applying and contacting. An age input is not robust age assurance.
 - **Signup enforces a 13+ minimum** and refuses under-13 accounts, which is what COPPA requires without verifiable parental consent; organization accounts require an adult 18 or older. Ages 13–17 must supply a guardian email and a guardian consent checkbox, and their account is marked “guardian confirmation pending”. **No guardian email is sent yet**, so a production release needs verifiable parental or guardian consent delivery, contact protections, limited visibility and counsel review before minors can be onboarded at scale.
-- Signup itself is not persistent: there is no server, so the password is checked and discarded (never stored in the browser), and the account resets on reload.
+- Password reset, email verification, multi-factor authentication and guardian-confirmation email are not implemented. "Forgot password?" explains that reset needs email delivery rather than pretending to send a link.
 - Candidate discovery is off by default in the demo, but the form toggle is not a privacy boundary. A production system must only expose opted-in profiles to authenticated/approved organizations and let candidates turn discovery off promptly.
 - Future listing forms must enforce all role, compensation, hours, location, eligibility, experience, responsibilities, application process, posting and expiry fields; prohibit fees, required purchases, misleading compensation and requests for credentials/sensitive documents. Applications must be initiated by the candidate and communicate through a controlled platform flow.
 
@@ -64,13 +67,14 @@ Implement per-application disclosure, controlled communications, block/report/mo
 1. Approve and document age scope, terms, privacy notice, prohibited conduct, support/escalation and moderation ownership.
 2. Assign a monitored privacy contact and a request-handling process for access, correction, deletion, opt-out and appeal requests, and have counsel review the draft privacy notice.
 3. Deliver real guardian confirmation by email before any under-18 account is activated.
-4. Add authorization tests proving candidates cannot read another candidate's records and recruiters cannot read another organization's data.
-5. Prove private content never appears in public HTML, search indexes, analytics, logs or ad systems.
-6. Implement and test report, block, moderation, removal, appeal and support flows.
-7. Define verification criteria, compensation disclosures, expiry and scam response.
-8. Implement/test account export, deletion and record retention.
-9. Keep candidate fees/pay-to-apply absent and label any future sponsored roles.
-10. Test keyboard, screen-reader, mobile and accessibility for recruitment/application flows.
-11. Run a limited pilot reviewed by candidates and organizations before broad rollout.
+4. Replace browser-held credentials with server authentication, email verification, password reset and session revocation.
+5. Add authorization tests proving candidates cannot read another candidate's records and recruiters cannot read another organization's data.
+6. Prove private content never appears in public HTML, search indexes, analytics, logs or ad systems.
+7. Implement and test report, block, moderation, removal, appeal and support flows.
+8. Define verification criteria, compensation disclosures, expiry and scam response.
+9. Implement/test account export, deletion and record retention.
+10. Keep candidate fees/pay-to-apply absent and label any future sponsored roles.
+11. Test keyboard, screen-reader, mobile and accessibility for recruitment/application flows.
+12. Run a limited pilot reviewed by candidates and organizations before broad rollout.
 
 Do not describe this build as a real marketplace or publicly launch it until these gates and the relevant legal/security reviews are complete.

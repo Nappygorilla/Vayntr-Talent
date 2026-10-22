@@ -89,7 +89,7 @@ test('the organization directory and player inbox have empty states', async ({ p
   await page.locator('footer').getByRole('button', { name: 'Organizations', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'No organizations listed yet' })).toBeVisible()
 
-  await page.getByRole('button', { name: /Inbox/ }).click()
+  await page.locator('footer').getByRole('button', { name: 'Messages', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'No conversations yet' })).toBeVisible()
 })
 
@@ -115,7 +115,7 @@ test('the profile saves the age locally and says so', async ({ page }) => {
   await page.locator('footer').getByRole('button', { name: 'My profile', exact: true }).click()
   await page.getByRole('spinbutton', { name: 'Age' }).fill('17')
   await page.getByRole('button', { name: 'Save profile' }).click()
-  await expect(page.getByRole('status')).toContainText('Profile saved on this device')
+  await expect(page.getByRole('status')).toContainText('Profile saved in this tab')
   await expect(page.getByRole('button', { name: 'Delete account' })).toHaveCount(0)
 })
 
@@ -161,33 +161,58 @@ test('home page uses the redesigned surfaces and only previews real roles', asyn
   await expect(page.locator('.empty-state')).toHaveCSS('border-radius', '20px')
 })
 
-test('anyone 13 or older can create a free player account with guardian consent', async ({ page }) => {
+const PASSWORD = 'correct-horse-battery-staple'
+
+async function openSignup(page: import('@playwright/test').Page) {
+  await page.locator('.header-actions').getByRole('button', { name: 'Join free' }).click()
+  await expect(page.getByRole('heading', { name: /Create your free account/i })).toBeVisible()
+}
+
+async function fillAccountStep(page: import('@playwright/test').Page, options: { name: string; email: string; age: number; state?: string; password?: string; confirm?: string }) {
+  await page.getByPlaceholder(/e\.g\. (the name you compete under|your team or studio name)/).fill(options.name)
+  await page.getByPlaceholder('you@example.com').fill(options.email)
+  await page.locator('#signup-password').fill(options.password ?? PASSWORD)
+  await page.locator('#signup-password-confirm').fill(options.confirm ?? options.password ?? PASSWORD)
+  await page.locator('label.form-field').filter({ hasText: /^State/ }).locator('select').selectOption(options.state ?? 'California')
+  await page.locator('input[type="number"]').fill(String(options.age))
+  if (options.age >= 13 && options.age < 18) await page.getByPlaceholder('guardian@example.com').fill('guardian@example.com')
+}
+
+test('a free player account is created with guardian consent and survives a reload', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Join free' }).click()
-  await expect(page.getByRole('heading', { name: /Create a free account/i })).toBeVisible()
+  await openSignup(page)
 
   // No account type chosen yet: the flow does not advance.
-  await page.getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
   await expect(page.locator('.field-error')).toContainText('Choose player, content creator, or esports organization')
 
   await page.locator('.role-choices').getByRole('button', { name: /^Player/ }).click()
-  await page.getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
   await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
 
-  await page.getByPlaceholder('e.g. the name you compete under').fill('Test Player')
-  await page.getByPlaceholder('you@example.com').fill('player@example.com')
-  await page.getByPlaceholder('At least 8 characters').fill('a-long-password')
-  await page.locator('label.form-field').filter({ hasText: /^State/ }).locator('select').selectOption('California')
-  await page.locator('input[type="number"]').fill('14')
-  await page.getByRole('button', { name: /^Continue/ }).click()
-  // A minor cannot get past this step without a guardian email.
-  await expect(page.locator('.field-error')).toContainText('parent or guardian email')
+  await fillAccountStep(page, { name: 'Test Player', email: 'player@example.com', age: 14 })
 
+  // Weak and mismatched passwords never reach account creation.
+  await page.locator('#signup-password').fill('short')
+  await page.locator('label.form-field').filter({ hasText: /^Age/ }).locator('input').fill('14')
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await expect(page.locator('.field-error')).toContainText('at least 12 characters')
+  await page.locator('#signup-password').fill(PASSWORD)
+  await page.locator('#signup-password-confirm').fill('something-else-entirely')
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await expect(page.locator('.field-error')).toContainText('do not match')
+  await page.locator('#signup-password-confirm').fill(PASSWORD)
+
+  // A minor cannot get past this step without a guardian email.
+  await page.getByPlaceholder('guardian@example.com').fill('')
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await expect(page.locator('.field-error')).toContainText('parent or guardian email')
   await page.getByPlaceholder('guardian@example.com').fill('guardian@example.com')
-  await page.getByRole('button', { name: /^Continue/ }).click()
+
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
   await expect(page.getByRole('heading', { name: 'Your game' })).toBeVisible()
   await page.locator('label.form-field').filter({ hasText: 'Primary game' }).locator('select').selectOption('Rocket League')
-  await page.getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
 
   // Consent cannot be skipped, and marketing is opt-in.
   await expect(page.getByRole('heading', { name: 'Privacy & consent' })).toBeVisible()
@@ -203,39 +228,101 @@ test('anyone 13 or older can create a free player account with guardian consent'
   await expect(page.getByText('Guardian confirmation pending')).toBeVisible()
   await expect(page.locator('.account-chip')).toContainText('Test Player')
 
-  await page.getByRole('button', { name: /Open my profile/ }).click()
+  // Only a salted hash is stored, never the password itself.
+  const stored = await page.evaluate(() => localStorage.getItem('vayntr.accounts.v1') ?? '')
+  expect(stored).toContain('"hash"')
+  expect(stored).toContain('"salt"')
+  expect(stored).not.toContain(PASSWORD)
+
+  await page.reload()
+  await expect(page.locator('.account-chip')).toContainText('Test Player')
+  await page.getByRole('button', { name: /Open your profile|Test Player/ }).click()
   await expect(page.getByRole('spinbutton', { name: 'Age' })).toHaveValue('14')
+
+  // Profile edits belong to the account, so they survive a reload too.
+  await page.locator('label.form-field').filter({ hasText: 'Display name' }).locator('input').fill('Test Player Two')
+  await page.getByRole('button', { name: 'Save profile' }).click()
+  await expect(page.getByRole('status')).toContainText('Profile saved to your account')
+  await page.reload()
+  await expect(page.locator('.account-chip')).toContainText('Test Player Two')
+})
+
+test('logging out and back in works and rejects the wrong password', async ({ page }) => {
+  await page.goto('/')
+  await openSignup(page)
+  await page.locator('.role-choices').getByRole('button', { name: /^Content creator/ }).click()
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await fillAccountStep(page, { name: 'Login Tester', email: 'login@example.com', age: 20 })
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('label.form-field').filter({ hasText: 'What do you make?' }).locator('select').selectOption('Short-form editing')
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.consent-list label').filter({ hasText: 'privacy notice and the safety rules' }).locator('input').check()
+  await page.locator('.signup-actions').getByRole('button', { name: /Create free account/ }).click()
+  await expect(page.locator('.account-chip')).toContainText('Login Tester')
+
+  await page.locator('.header-actions').getByRole('button', { name: 'Log out' }).click()
+  await expect(page.locator('.account-chip')).toHaveCount(0)
+
+  await page.locator('.header-actions').getByRole('button', { name: 'Log in' }).click()
+  await expect(page.getByRole('heading', { name: /Log in to your account/i })).toBeVisible()
+  await page.getByPlaceholder('you@example.com').fill('login@example.com')
+  await page.getByPlaceholder('Your password').fill('definitely-not-the-password')
+  await page.locator('.auth-form').getByRole('button', { name: /^Log in/ }).click()
+  await expect(page.locator('.field-error')).toContainText('Email or password is incorrect')
+
+  await page.getByPlaceholder('Your password').fill(PASSWORD)
+  await page.locator('.auth-form').getByRole('button', { name: /^Log in/ }).click()
+  await expect(page.locator('.account-chip')).toContainText('Login Tester')
+  await expect(page.getByRole('heading', { name: /Your path/i })).toBeVisible()
+})
+
+test('an email can only be used once on the device', async ({ page }) => {
+  await page.goto('/')
+  await openSignup(page)
+  await page.locator('.role-choices').getByRole('button', { name: /^Player/ }).click()
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await fillAccountStep(page, { name: 'First Account', email: 'duplicate@example.com', age: 21 })
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('label.form-field').filter({ hasText: 'Primary game' }).locator('select').selectOption('VALORANT')
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.consent-list label').filter({ hasText: 'privacy notice and the safety rules' }).locator('input').check()
+  await page.locator('.signup-actions').getByRole('button', { name: /Create free account/ }).click()
+  await expect(page.locator('.account-chip')).toContainText('First Account')
+
+  await page.locator('.header-actions').getByRole('button', { name: 'Log out' }).click()
+  await openSignup(page)
+  await page.locator('.role-choices').getByRole('button', { name: /^Player/ }).click()
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await fillAccountStep(page, { name: 'Second Account', email: 'duplicate@example.com', age: 21 })
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('label.form-field').filter({ hasText: 'Primary game' }).locator('select').selectOption('VALORANT')
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.consent-list label').filter({ hasText: 'privacy notice and the safety rules' }).locator('input').check()
+  await page.locator('.signup-actions').getByRole('button', { name: /Create free account/ }).click()
+  await expect(page.locator('.field-error')).toContainText('already exists on this device')
 })
 
 test('children under 13 cannot create an account', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Join free' }).click()
+  await openSignup(page)
   await page.locator('.role-choices').getByRole('button', { name: /^Content creator/ }).click()
-  await page.getByRole('button', { name: /^Continue/ }).click()
-  await page.getByPlaceholder('e.g. the name you compete under').fill('Too Young')
-  await page.getByPlaceholder('you@example.com').fill('kid@example.com')
-  await page.getByPlaceholder('At least 8 characters').fill('a-long-password')
-  await page.locator('label.form-field').filter({ hasText: /^State/ }).locator('select').selectOption('Texas')
-  await page.locator('input[type="number"]').fill('12')
-  await page.getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await fillAccountStep(page, { name: 'Too Young', email: 'kid@example.com', age: 12 })
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
   await expect(page.locator('.field-error')).toContainText('cannot create accounts for children under 13')
   await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
 })
 
 test('an organization signs up free and gets its own workspace', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Join free' }).click()
+  await openSignup(page)
   await page.locator('.role-choices').getByRole('button', { name: /^Esports organization/ }).click()
-  await page.getByRole('button', { name: /^Continue/ }).click()
-  await page.getByPlaceholder('e.g. your team or studio name').fill('Harbor Nine')
-  await page.getByPlaceholder('you@example.com').fill('team@example.com')
-  await page.getByPlaceholder('At least 8 characters').fill('a-long-password')
-  await page.locator('label.form-field').filter({ hasText: /^State/ }).locator('select').selectOption('New York')
-  await page.locator('input[type="number"]').fill('30')
-  await page.getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await fillAccountStep(page, { name: 'Harbor Nine', email: 'team@example.com', age: 30, state: 'New York' })
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
   await expect(page.getByRole('heading', { name: 'Your organization' })).toBeVisible()
   await page.locator('label.form-field').filter({ hasText: 'Organization type' }).locator('select').selectOption('Esports team')
-  await page.getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
   await page.locator('.consent-list label').filter({ hasText: 'privacy notice and the safety rules' }).locator('input').check()
   await page.locator('.signup-actions').getByRole('button', { name: /Create free account/ }).click()
   await expect(page.getByText('Active on this device')).toBeVisible()
@@ -256,4 +343,38 @@ test('the privacy notice lists US rights and the no-sale position', async ({ pag
   await expect(page.getByRole('heading', { name: 'No sale, no ad tracking' })).toBeVisible()
   await expect(page.getByText(/COPPA/).first()).toBeVisible()
   await expect(page.locator('.rights-list li')).toHaveCount(8)
+})
+
+test('an account can export its data and delete itself', async ({ page }) => {
+  await page.goto('/')
+  await openSignup(page)
+  await page.locator('.role-choices').getByRole('button', { name: /^Player/ }).click()
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await fillAccountStep(page, { name: 'Export Tester', email: 'export@example.com', age: 22 })
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('label.form-field').filter({ hasText: 'Primary game' }).locator('select').selectOption('Overwatch 2')
+  await page.locator('.signup-actions').getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.consent-list label').filter({ hasText: 'privacy notice and the safety rules' }).locator('input').check()
+  await page.locator('.signup-actions').getByRole('button', { name: /Create free account/ }).click()
+  await expect(page.locator('.account-chip')).toContainText('Export Tester')
+
+  await page.locator('.account-chip').click()
+  const downloadEvent = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export my data' }).click()
+  const download = await downloadEvent
+  expect(download.suggestedFilename()).toBe('vayntr-talent-account.json')
+
+  await page.getByRole('button', { name: 'Delete account' }).click()
+  await expect(page.getByRole('alertdialog')).toBeVisible()
+  await page.locator('.delete-confirm').getByRole('button', { name: 'Delete account' }).click()
+  await expect(page.getByRole('status')).toContainText('Account deleted from this device')
+  await expect(page.locator('.account-chip')).toHaveCount(0)
+  await expect.poll(async () => page.evaluate(() => localStorage.getItem('vayntr.accounts.v1'))).toBe('[]')
+
+  // The deleted credentials no longer sign in.
+  await page.locator('.header-actions').getByRole('button', { name: 'Log in' }).click()
+  await page.getByPlaceholder('you@example.com').fill('export@example.com')
+  await page.getByPlaceholder('Your password').fill(PASSWORD)
+  await page.locator('.auth-form').getByRole('button', { name: /^Log in/ }).click()
+  await expect(page.locator('.field-error')).toContainText('Email or password is incorrect')
 })

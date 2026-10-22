@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Check, CircleAlert, Plus, Search, ShieldCheck, UserRound } from 'lucide-react'
-import { PrivacyPage, SignUpPage, roleLabels, type Account } from './account'
+import { PrivacyPage, SignInPage, SignUpPage, deleteAccount, endSession, restoreSession, roleLabels, updateAccount, type Account } from './auth'
 type Listing = {
   id: string; title: string; org: string; mark: string; category: string; game: string; openings: number
   engagement: string; salary: string; payTerms: string; hours: string; schedule: string; location: string; eligibility: string
@@ -63,6 +63,7 @@ const commandActions = [
   { page: 'For organizations', label: 'For organizations', description: 'Open your organization workspace', keywords: 'recruiters inbox dashboard', icon: '▤' },
   { page: 'My profile', label: 'My profile', description: 'Edit your candidate profile', keywords: 'candidate settings visibility', icon: '◎' },
   { page: 'Applications', label: 'Applications', description: 'Review and withdraw applications', keywords: 'candidate status withdraw', icon: '↳' },
+  { page: 'Log in', label: 'Log in', description: 'Sign in to your account on this device', keywords: 'login signin account session password', icon: '→' },
   { page: 'Sign up', label: 'Create a free account', description: 'Join as a player, creator, or organization', keywords: 'register signup join free account membership', icon: '✳' },
   { page: 'Privacy', label: 'Privacy notice', description: 'Your data, rights, and US state privacy law', keywords: 'ccpa cpra coppa privacy data rights', icon: '◇' },
   { page: 'Moderation', label: 'Moderator dashboard', description: 'Review reports and cases', keywords: 'staff reports cases', icon: '▦' },
@@ -76,6 +77,7 @@ function App() {
   const [applications, setApplications] = useState<Application[]>([])
   const [notice, setNotice] = useState('')
   const [account, setAccount] = useState<Account | null>(null)
+  const [signupKey, setSignupKey] = useState(0)
   const [profileName, setProfileName] = useState('')
   const [age, setAge] = useState<number | null>(null)
   const [visible, setVisible] = useState(false)
@@ -89,6 +91,10 @@ function App() {
   const [commandQuery, setCommandQuery] = useState('')
   const [commandSelection, setCommandSelection] = useState(0)
   const categories = ['All roles', ...new Set(listings.map((item) => item.category))]
+  useEffect(() => {
+    const restored = restoreSession()
+    if (restored) applySession(restored)
+  }, [])
   useEffect(() => {
     const navigate = (event: Event) => { const next = (event as CustomEvent<string>).detail; setPage(next); setSelected(null); setMobileMenu(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }
     window.addEventListener('navigate-page', navigate)
@@ -115,17 +121,58 @@ function App() {
     const normalized = commandQuery.trim().toLowerCase()
     return commandActions.filter((action) => `${action.label} ${action.description} ${action.keywords}`.toLowerCase().includes(normalized))
   }, [commandQuery])
-  function go(next: string) { setPage(next); setSelected(null); setMobileMenu(false); setCommandOpen(false); setCommandQuery(''); setCommandSelection(0); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  function go(next: string) { if (next === 'Sign up') setSignupKey((value) => value + 1); setPage(next); setSelected(null); setMobileMenu(false); setCommandOpen(false); setCommandQuery(''); setCommandSelection(0); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   function apply(item: Listing, shared: string[]) {
     if (!applications.some((application) => application.listingId === item.id)) setApplications([...applications, { listingId: item.id, status: 'Received', shared }])
     setNotice(`Application saved on this device for ${item.title}.`)
   }
   function updateStatus(id: string, status: string) { setApplications(applications.map((app) => app.listingId === id ? { ...app, status } : app)) }
   function showNotice(text: string) { setNotice(text); window.setTimeout(() => setNotice(''), 5000) }
-  function createAccount(next: Account) {
+  function applySession(next: Account) {
     setAccount(next)
     setProfileName(next.name)
     if (next.role !== 'organization') setAge(next.age)
+  }
+  function logOut() {
+    endSession()
+    setAccount(null)
+    setProfileName('')
+    setAge(null)
+    showNotice('Logged out. Your account is still on this device.')
+  }
+  function removeAccount() {
+    if (!account) return
+    deleteAccount(account.id)
+    setAccount(null)
+    setProfileName('')
+    setAge(null)
+    setVisible(false)
+    showNotice('Account deleted from this device.')
+    go('Home')
+  }
+  function exportAccountData() {
+    if (!account) return showNotice('Create a free account to export account data.')
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      account,
+      profile: { displayName: profileName, age, candidateDiscovery: visible },
+    }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'vayntr-talent-account.json'
+    link.click()
+    URL.revokeObjectURL(url)
+    showNotice('Your account data was downloaded as JSON.')
+  }
+  function saveProfile() {
+    if (!account) {
+      showNotice('Profile saved in this tab. Create a free account to keep it.')
+      return
+    }
+    const stored = updateAccount(account.id, age === null ? { name: profileName } : { name: profileName, age })
+    if (stored) applySession({ ...account, name: stored.name, age: stored.age })
+    showNotice('Profile saved to your account on this device.')
   }
   function ensureConversation(input: Omit<Conversation, 'id' | 'messages'> & { opener: string; from: 'org' | 'player' }) {
     const existing = conversations.find((conversation) => conversation.org === input.org && conversation.playerId === input.playerId)
@@ -154,25 +201,26 @@ function App() {
       <button className="menu-button" aria-label="Toggle navigation" aria-expanded={mobileMenu} aria-controls="primary-nav" onClick={() => setMobileMenu(!mobileMenu)}>☰</button>
       <nav id="primary-nav" className={mobileMenu ? 'nav open' : 'nav'} aria-label="Main navigation">{pages.slice(0, 5).map((item) => <button key={item} className={page === item ? 'nav-item active' : 'nav-item'} onClick={() => go(item)}>{item}</button>)}</nav>
       <button className="command-trigger" type="button" aria-label="Open quick navigation (Ctrl or Command plus K)" aria-keyshortcuts="Control+K Meta+K" onClick={() => { setCommandQuery(''); setCommandSelection(0); setCommandOpen(true) }}><span className="command-trigger-icon" aria-hidden="true">⌕</span><span className="command-trigger-label">Quick jump</span><kbd>Ctrl K</kbd></button>
-      <div className="header-actions"><button className="inbox-link" onClick={() => go('Messages')}>Inbox{awaitingReply > 0 && <span className="inbox-badge">{awaitingReply}</span>}</button>{account ? <><button className="account-chip" onClick={() => go('My profile')} aria-label={`Signed in as ${account.name}. Open your profile`}><span className="account-chip-mark" aria-hidden="true">{account.name.slice(0, 1).toUpperCase()}</span><span className="account-chip-copy"><strong>{account.name}</strong><small>{roleLabels[account.role]}</small></span></button><button className="signout-link" onClick={() => { setAccount(null); showNotice('Signed out on this device.') }}>Sign out</button></> : <button className="signin" onClick={() => go('Sign up')}>Join free</button>}<button className="button button-red button-small" onClick={() => go('Marketplace')}>Explore roles <span className="button-arrow" aria-hidden="true">↗</span></button></div>
+      <div className="header-actions">{account ? <button className="inbox-link" onClick={() => go('Messages')}>Inbox{awaitingReply > 0 && <span className="inbox-badge">{awaitingReply}</span>}</button> : null}{account ? <><button className="account-chip" onClick={() => go('My profile')} aria-label={`Signed in as ${account.name}. Open your profile`}><span className="account-chip-mark" aria-hidden="true">{account.name.slice(0, 1).toUpperCase()}</span><span className="account-chip-copy"><strong>{account.name}</strong><small>{roleLabels[account.role]}</small></span></button><button className="signout-link" onClick={logOut}>Log out</button></> : <><button className="signin" onClick={() => go('Log in')}>Log in</button><button className="button button-red button-small" onClick={() => go('Sign up')}>Join free</button></>}<button className="button button-outline button-small header-secondary" onClick={() => go('Marketplace')}>Explore roles <span className="button-arrow" aria-hidden="true">↗</span></button></div>
     </header>
     {notice && <div className="notice" role="status"><span>{notice}</span><button aria-label="Dismiss message" onClick={() => setNotice('')}>×</button></div>}
     {commandOpen && <div className="command-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCommandOpen(false) }}><section className="command-palette" role="dialog" aria-modal="true" aria-labelledby="command-title"><h2 id="command-title" className="sr-only">Quick navigation</h2><div className="command-search-row"><span className="command-search-icon" aria-hidden="true">⌕</span><input autoFocus aria-label="Search pages and actions" role="combobox" aria-controls="quick-nav-results" aria-expanded="true" value={commandQuery} onChange={(event) => { setCommandQuery(event.target.value); setCommandSelection(0) }} onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); setCommandSelection((current) => matchingCommands.length ? (current + 1) % matchingCommands.length : 0) } else if (event.key === 'ArrowUp') { event.preventDefault(); setCommandSelection((current) => matchingCommands.length ? (current - 1 + matchingCommands.length) % matchingCommands.length : 0) } else if (event.key === 'Enter') { event.preventDefault(); const action = matchingCommands[commandSelection]; if (action) go(action.page) } }} placeholder="Jump to a page or workspace…" /><kbd className="command-escape">ESC</kbd></div><div id="quick-nav-results" className="command-results" role="listbox" aria-label="Navigation results">{matchingCommands.map((action, index) => <button key={action.page} id={`quick-nav-option-${index}`} type="button" role="option" aria-selected={index === commandSelection} className={index === commandSelection ? 'command-option selected' : 'command-option'} onMouseEnter={() => setCommandSelection(index)} onClick={() => go(action.page)}><span className="command-option-icon" aria-hidden="true">{action.icon}</span><span className="command-option-copy"><strong>{action.label}</strong><small>{action.description}</small></span><kbd>↵</kbd></button>)}</div>{matchingCommands.length === 0 && <div className="command-empty">No matching page. Try a shorter search.</div>}<div className="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> Move</span><span><kbd>Enter</kbd> Open</span><span><kbd>Esc</kbd> Close</span></div></section></div>}
     {page === 'Home' && <HomePage go={go} />}
-    {page === 'Sign up' && <SignUpPage go={go} games={gameAgePolicies.map((policy) => policy.game)} ageFloors={Object.fromEntries(gameAgePolicies.map((policy) => [policy.game, policy.minAge]))} onCreated={createAccount} />}
+    {page === 'Sign up' && <SignUpPage key={signupKey} go={go} games={gameAgePolicies.map((policy) => policy.game)} ageFloors={Object.fromEntries(gameAgePolicies.map((policy) => [policy.game, policy.minAge]))} onCreated={applySession} />}
+    {page === 'Log in' && <SignInPage go={go} onSignedIn={applySession} onNotice={showNotice} />}
     {page === 'Privacy' && <PrivacyPage go={go} />}
     {page === 'Marketplace' && <Marketplace query={query} setQuery={setQuery} category={category} setCategory={setCategory} categories={categories} filtered={filtered} hasRoles={listings.length > 0} onSelect={setSelected} selected={selected} apply={apply} applications={applications} onReport={() => setReportOpen(true)} blocked={blocked} setBlocked={setBlocked} go={go} age={age} onEditProfile={() => go('My profile')} onMessageOrg={contactOrg} />}
     {page === 'Players' && <PlayersPage players={players} onMessage={contactPlayer} go={go} />}
     {page === 'Messages' && <MessagesPage conversations={playerThreads} activeId={activeThread} setActiveId={setActiveThread} onSend={(id, body) => sendMessage(id, body, 'player')} go={go} />}
     {page === 'Organizations' && <OrganizationsPage go={go} />}
     {page === 'For organizations' && <OrganizationPage go={go} account={account} />}
-    {page === 'My profile' && <ProfilePage name={profileName} setName={setProfileName} visible={visible} setVisible={setVisible} onNotice={showNotice} age={age} setAge={setAge} onOpenTrust={() => go('Trust & safety')} />}
+    {page === 'My profile' && <ProfilePage account={account} name={profileName} setName={setProfileName} visible={visible} setVisible={setVisible} onNotice={showNotice} age={age} setAge={setAge} onOpenTrust={() => go('Trust & safety')} onSave={saveProfile} onLogOut={logOut} onExport={exportAccountData} onDeleteAccount={removeAccount} onCreate={() => go('Sign up')} />}
     {page === 'Applications' && <ApplicationsPage applications={applications} updateStatus={updateStatus} onNotice={showNotice} />}
     {page === 'Trust & safety' && <TrustPage onReport={() => setReportOpen(true)} onModeration={() => go('Moderation')} onPrivacy={() => go('Privacy')} />}
     {page === 'Moderation' && <ModerationPage />}
     {page === 'Resources' && <ResourcesPage />}
     
-    <footer className="footer"><div className="footer-main"><div><a className="brand footer-brand" href="#home" onClick={(event) => { event.preventDefault(); go('Home') }}><span className="brand-symbol">V<span>.</span></span><span className="brand-text">VAYNTR<span>TALENT</span></span></a><p className="footer-tagline">Find your next team. Build with care.</p></div><div className="footer-nav"><button onClick={() => go('Marketplace')}>Marketplace</button><button onClick={() => go('Players')}>Players</button><button onClick={() => go('Organizations')}>Organizations</button><button onClick={() => go('Messages')}>Messages</button><button onClick={() => go('Resources')}>Resources</button><button onClick={() => go('Trust & safety')}>Trust &amp; safety</button><button onClick={() => go('For organizations')}>For organizations</button><button onClick={() => go('My profile')}>My profile</button><button onClick={() => go('Applications')}>Applications</button><button onClick={() => go('Privacy')}>Privacy</button></div><div className="footer-contact"><strong>Need help?</strong><button onClick={() => setFeedbackOpen(true)}>Contact support</button><span>Safety and moderation questions welcome</span></div></div><div className="footer-bottom"><span>© 2026 VAYNTR Talent</span><span>Recruitment is not guaranteed. Evaluate every opportunity carefully.</span><button onClick={() => go('Privacy')}>Privacy &amp; safety</button></div></footer>
+    <footer className="footer"><div className="footer-main"><div><a className="brand footer-brand" href="#home" onClick={(event) => { event.preventDefault(); go('Home') }}><span className="brand-symbol">V<span>.</span></span><span className="brand-text">VAYNTR<span>TALENT</span></span></a><p className="footer-tagline">Find your next team. Build with care.</p></div><div className="footer-nav"><button onClick={() => go('Marketplace')}>Marketplace</button><button onClick={() => go('Players')}>Players</button><button onClick={() => go('Organizations')}>Organizations</button><button onClick={() => go('Messages')}>Messages</button><button onClick={() => go('Resources')}>Resources</button><button onClick={() => go('Trust & safety')}>Trust &amp; safety</button><button onClick={() => go('For organizations')}>For organizations</button><button onClick={() => go('My profile')}>My profile</button><button onClick={() => go('Applications')}>Applications</button><button onClick={() => go('Sign up')}>Join free</button><button onClick={() => go('Log in')}>Log in</button><button onClick={() => go('Privacy')}>Privacy</button></div><div className="footer-contact"><strong>Need help?</strong><button onClick={() => setFeedbackOpen(true)}>Contact support</button><span>Safety and moderation questions welcome</span></div></div><div className="footer-bottom"><span>© 2026 VAYNTR Talent</span><span>Recruitment is not guaranteed. Evaluate every opportunity carefully.</span><button onClick={() => go('Privacy')}>Privacy &amp; safety</button></div></footer>
     {reportOpen && <ReportDialog onClose={() => setReportOpen(false)} onSubmit={(reason) => { setReportOpen(false); showNotice(`Report saved on this device (${reason}).`) }} />}
     <FeedbackWidget onNotice={showNotice} open={feedbackOpen} setOpen={setFeedbackOpen} />
   </div>
@@ -189,7 +237,7 @@ function HomePage({ go }: { go: (page: string) => void }) {
             <button className="button button-red" onClick={() => go('Marketplace')}>Explore opportunities <span className="button-arrow" aria-hidden="true">↗</span></button>
             <button className="button button-outline" onClick={() => go('For organizations')}>I’m an organization</button>
           </div>
-          <p className="hero-note"><span className="checkmark">✓</span> Free to create a candidate profile and apply. No pay-to-play.</p>
+          <p className="hero-note"><span className="checkmark">✓</span> Free to join as a player, creator, or organization. No pay-to-play.</p>
         </div>
         <div className="hero-visual" role="img" aria-label="Abstract VAYNTR graphic about finding your next opportunity">
           <div className="hero-art-meta"><span>VT / 001</span><span>INDEPENDENT TALENT NETWORK</span></div>
@@ -410,7 +458,59 @@ function OrganizationPage({ go, account }: { go: (x: string) => void; account: A
     <div className="launch-callout"><strong>Before accepting applicants</strong><span>Establish recruiter permissions, written compensation terms, listing expiry, response timelines, and a clear report/escalation process.</span></div>
   </section>
 }
-function ProfilePage({ name, setName, visible, setVisible, onNotice, age, setAge, onOpenTrust }: { name: string; setName: (x: string) => void; visible: boolean; setVisible: (x: boolean) => void; onNotice: (x: string) => void; age: number | null; setAge: (x: number | null) => void; onOpenTrust: () => void }) { return <section className="page-wrap wrap"><div className="page-heading"><div className="eyebrow">CANDIDATE PROFILE</div><h1>Your path.<br /><span>Your terms.</span></h1><p>Candidate profiles are private by default. Share only the information you choose with each application.</p></div><div className="profile-layout"><div className="profile-form card-panel"><div className="panel-top"><div><div className="eyebrow">YOUR CANDIDATE PROFILE</div><h2>Build your profile</h2></div><span className="private-chip">🔒 Private by default</span></div><div className="form-grid"><label className="form-field span-2">Display name / chosen name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. chosen name" /></label><label className="form-field">Region<input placeholder="e.g. North America" /></label><label className="form-field">Time zone<input placeholder="e.g. UTC−5" /></label><label className="form-field span-2">Languages<input placeholder="e.g. English, Spanish" /></label><label className="form-field span-2">Desired roles<input placeholder="e.g. Analyst, player, editor" /></label><label className="form-field span-2">Games / content areas<input placeholder="e.g. VALORANT, FPS analysis" /></label><label className="form-field span-2">Skills<textarea rows={3} placeholder="Skills you'd like to highlight" /></label><label className="form-field">Experience<select defaultValue=""><option value="" disabled>Select experience</option><option>Learning / aspiring</option><option>Some team or project experience</option><option>Experienced</option></select></label><label className="form-field">Availability<input placeholder="e.g. 5 hrs/week" /></label><label className="form-field span-2">Portfolio links<input placeholder="https://… (optional)" /></label><label className="form-field span-2">Optional gaming handles / achievements<input placeholder="Only add public handles you choose to share" /></label><label className="form-field">Compensation expectations<input placeholder="Optional; explain clearly" /></label><label className="form-field">Age<input type="number" min={13} max={99} value={age ?? ''} onChange={(event) => setAge(event.target.value ? Number(event.target.value) : null)} placeholder="e.g. 17" /></label></div><div className="visibility-control"><div><strong>Allow candidate discovery</strong><span>Off by default. Real discovery should be limited to authenticated, approved organizations.</span></div><button role="switch" aria-checked={visible} aria-label="Allow candidate discovery" className={visible ? 'switch on' : 'switch'} onClick={() => setVisible(!visible)}><span /></button></div><p className="age-profile-note">Your age decides which games you can be signed for. Rocket League 13+, Apex 16+, Overwatch 17+, VALORANT and Warzone 18+. Under 18 also needs guardian consent. <button type="button" className="text-link" onClick={onOpenTrust}>See every game</button></p><div className="form-actions"><button className="button button-red" onClick={() => onNotice(age === null ? 'Add your age so we can match you with eligible games.' : 'Profile saved on this device. Accounts are not connected yet.')}>Save profile</button><button className="text-link" onClick={() => onNotice('Profile export is not available yet.')}>Export my data</button><button className="text-link danger-link" onClick={() => { setName(''); setVisible(false); onNotice('Profile cleared.') }}>Delete profile</button></div><p className="fine-print">Share only what you are comfortable showing an organization. Never enter identity documents, home address, or financial details.</p></div><aside className="profile-sidebar"><div className="side-callout"><span className="feature-icon">◇</span><h3>You decide what travels.</h3><p>Review every field before sharing it with a specific application. Never share sensitive data just to prove your worth.</p></div><button className="button button-outline full-width" onClick={() => onNotice('Support and appeals are not connected yet.')}>Contact support / appeal</button></aside></div></section> }
+function ProfilePage({
+  account, name, setName, visible, setVisible, onNotice, age, setAge, onOpenTrust,
+  onSave, onLogOut, onExport, onDeleteAccount, onCreate,
+}: {
+  account: Account | null; name: string; setName: (x: string) => void; visible: boolean; setVisible: (x: boolean) => void
+  onNotice: (x: string) => void; age: number | null; setAge: (x: number | null) => void; onOpenTrust: () => void
+  onSave: () => void; onLogOut: () => void; onExport: () => void; onDeleteAccount: () => void; onCreate: () => void
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  return <section className="page-wrap wrap">
+    <div className="page-heading"><div className="eyebrow">YOUR PROFILE</div><h1>Your path.<br /><span>Your terms.</span></h1><p>Profiles are private by default. Share only the information you choose with each application.</p></div>
+    <div className="profile-layout">
+      <div className="profile-form card-panel">
+        <div className="panel-top"><div><div className="eyebrow">YOUR DETAILS</div><h2>Build your profile</h2></div><span className="private-chip">🔒 Private by default</span></div>
+        {account
+          ? <div className="profile-account"><div><strong>{account.email}</strong><span>{roleLabels[account.role]} · {account.region}</span></div><button type="button" className="text-link" onClick={onLogOut}>Log out</button></div>
+          : <p className="profile-account-note">You are browsing without an account. <button type="button" className="text-link" onClick={onCreate}>Create a free account</button> to keep these details.</p>}
+        <div className="form-grid">
+          <label className="form-field span-2">Display name / chosen name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. chosen name" maxLength={60} /></label>
+          <label className="form-field">Region<input placeholder="e.g. North America" /></label>
+          <label className="form-field">Time zone<input placeholder="e.g. UTC−5" /></label>
+          <label className="form-field span-2">Languages<input placeholder="e.g. English, Spanish" /></label>
+          <label className="form-field span-2">Desired roles<input placeholder="e.g. Analyst, player, editor" /></label>
+          <label className="form-field span-2">Games / content areas<input placeholder="e.g. VALORANT, FPS analysis" /></label>
+          <label className="form-field span-2">Skills<textarea rows={3} placeholder="Skills you'd like to highlight" /></label>
+          <label className="form-field">Experience<select defaultValue=""><option value="" disabled>Select experience</option><option>Learning / aspiring</option><option>Some team or project experience</option><option>Experienced</option></select></label>
+          <label className="form-field">Availability<input placeholder="e.g. 5 hrs/week" /></label>
+          <label className="form-field span-2">Portfolio links<input placeholder="https://… (optional)" /></label>
+          <label className="form-field span-2">Optional gaming handles / achievements<input placeholder="Only add public handles you choose to share" /></label>
+          <label className="form-field">Compensation expectations<input placeholder="Optional; explain clearly" /></label>
+          <label className="form-field">Age<input type="number" min={13} max={99} value={age ?? ''} onChange={(event) => setAge(event.target.value ? Number(event.target.value) : null)} placeholder="e.g. 17" /></label>
+        </div>
+        <div className="visibility-control"><div><strong>Allow candidate discovery</strong><span>Off by default. Real discovery should be limited to authenticated, approved organizations.</span></div><button role="switch" aria-checked={visible} aria-label="Allow candidate discovery" className={visible ? 'switch on' : 'switch'} onClick={() => setVisible(!visible)}><span /></button></div>
+        <p className="age-profile-note">Your age decides which games you can be signed for. Rocket League 13+, Apex 16+, Overwatch 17+, VALORANT and Warzone 18+. Under 18 also needs guardian consent. <button type="button" className="text-link" onClick={onOpenTrust}>See every game</button></p>
+        <div className="form-actions">
+          <button className="button button-red" onClick={onSave}>Save profile</button>
+          {account ? <button type="button" className="text-link" onClick={onExport}>Export my data</button> : null}
+          {account ? <button type="button" className="text-link danger-link" onClick={() => setConfirmDelete(true)}>Delete account</button> : null}
+        </div>
+        <p className="fine-print">Share only what you are comfortable showing an organization. Never enter identity documents, home address, or financial details.</p>
+        {account && confirmDelete ? <div className="delete-confirm" role="alertdialog" aria-labelledby="delete-title">
+          <div><strong id="delete-title">Delete this account?</strong><p>This removes the account, its password hash and its session from this browser. It cannot be undone.</p></div>
+          <div className="delete-confirm-actions"><button type="button" className="button button-outline" onClick={() => setConfirmDelete(false)}>Keep my account</button><button type="button" className="button button-red" onClick={onDeleteAccount}>Delete account</button></div>
+        </div> : null}
+      </div>
+      <aside className="profile-sidebar">
+        <div className="side-callout"><span className="feature-icon">◇</span><h3>You decide what travels.</h3><p>Review every field before sharing it with a specific application. Never share sensitive data just to prove your worth.</p></div>
+        <div className="auth-note"><p>{account ? 'Your profile is stored with your account on this device. Deleting the account removes both.' : 'Without an account, these fields live only in this tab and reset on reload.'}</p></div>
+        <button className="button button-outline full-width" onClick={() => onNotice('Support and appeals are not connected yet.')}>Contact support / appeal</button>
+      </aside>
+    </div>
+  </section>
+}
 function ApplicationsPage({ applications, updateStatus, onNotice }: { applications: Application[]; updateStatus: (id: string, status: string) => void; onNotice: (x: string) => void }) { return <section className="page-wrap wrap"><div className="page-heading"><div className="eyebrow">YOUR APPLICATIONS</div><h1>Your <span>applications.</span></h1><p>Track progress and withdraw whenever you choose.</p></div><div className="applications-panel card-panel">{applications.length ? applications.map((app) => { const role = listings.find((x) => x.id === app.listingId); return <div className="application-row candidate-app" key={app.listingId}><div className="org-mark">{role?.mark}</div><div className="applicant-details"><strong>{role?.title ?? 'Role'}</strong><span>{role?.org} · Shared: {app.shared.join(', ')}</span></div><div className="candidate-status"><span className={`status-label ${app.status.toLowerCase().replace(' ', '-')}`}>{app.status}</span>{app.status !== 'Withdrawn' && <button className="text-link danger-link" onClick={() => { updateStatus(app.listingId, 'Withdrawn'); onNotice('Application withdrawn.') }}>Withdraw</button>}</div></div> }) : <div className="empty-state"><span className="button-arrow" aria-hidden="true">↗</span><h2>No applications yet</h2><p>When you apply to a role, your status will appear here.</p></div>}</div><div className="privacy-note"><strong>Application privacy</strong><p>Choose the information you share per role. In production, applications are visible only to authorized recruiters for that listing’s organization.</p></div></section> }
 function TrustPage({ onReport, onModeration, onPrivacy }: { onReport: () => void; onModeration: () => void; onPrivacy: () => void }) { return <section className="page-wrap wrap"><div className="page-heading"><div className="eyebrow">SAFETY IS A SHARED PRACTICE</div><h1>Stay sharp.<br /><span>Stay in control.</span></h1><p>Verification can’t eliminate risk. No opportunity is worth compromising your safety or privacy.</p></div><div className="trust-grid"><article className="trust-card"><span className="trust-number">01</span><h2>Check the opportunity</h2><p>Look for a clear role, defined hours, location, and written compensation terms. Verify the organization through independent channels—not only a badge or listing.</p></article><article className="trust-card"><span className="trust-number">02</span><h2>Keep control of your data</h2><p>Never provide passwords, financial credentials, identity documents, exact birth dates, or home address for a recruitment application. Share only what you choose.</p></article><article className="trust-card"><span className="trust-number">03</span><h2>Never pay to apply</h2><p>VAYNTR Talent does not charge candidates to create profiles or apply. Be wary of application fees, required purchases, and pay-to-play promises.</p></article><article className="trust-card"><span className="trust-number">04</span><h2>Know the age boundary</h2><p>Minimum ages come from each scene’s competition rules, not from us. Rocket League starts at 13, Apex at 16, Overwatch at 17, WARZONE and VALORANT at 18. Anyone under 18 needs a guardian’s consent to be signed.</p></article></div><section className="age-policy" aria-labelledby="age-policy-title"><div className="age-policy-head"><div className="eyebrow">AGE &amp; ELIGIBILITY</div><h2 id="age-policy-title">Every scene sets<br />its own floor.</h2><p>We check each listing against the rules published by the competition. Where a rulebook sets a higher age—or a country does—the higher number applies. Guardian consent is required for every player under 18, and an organization signing a minor also needs a guardian’s signature.</p></div><div className="age-grid">{gameAgePolicies.map((policy) => <div className="age-row" key={policy.game}><div className="age-row-copy"><h3>{policy.game}</h3><p>{policy.note}</p></div><span className="age-number">{policy.minAge}+</span>{policy.source ? <a href={policy.source} target="_blank" rel="noreferrer">Rules ↗</a> : null}</div>)}</div><p className="age-policy-note">Checked against published competition rules in October 2026. Organizers can apply stricter limits to a specific qualifier or event. This is guidance, not legal advice.</p></section><div className="report-panel"><div><div className="eyebrow">SEE SOMETHING WRONG?</div><h2>Report it. Block it. Get help.</h2><p>Reports go to the moderation queue with the listing or account you were viewing. Include only what you are comfortable sharing.</p></div><div className="report-buttons"><button className="button button-red" onClick={onReport}>Report a listing or account</button></div></div><div className="trust-footnote"><strong>Organization checked is not identity checked.</strong><p>Any future verification label must state the exact organization records checked and when. It must never imply that every role or individual is safe, legitimate, or endorsed by VAYNTR.</p><button className="text-link" onClick={onModeration}>Moderator review dashboard <span className="button-arrow" aria-hidden="true">↗</span></button><button className="text-link" onClick={onPrivacy}>Privacy notice &amp; your US rights <span className="button-arrow" aria-hidden="true">↗</span></button></div></section> }
 function ModerationPage() {
