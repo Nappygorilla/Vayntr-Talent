@@ -49,6 +49,7 @@ test('the marketplace offers both sides of the market', async ({ page }) => {
   await page.getByRole('tab', { name: /Orgs looking for players/i }).click()
   await expect(page.getByRole('heading', { name: /Find your next role/i })).toBeVisible()
   await expect(page.getByText('5 open roles')).toBeVisible()
+  await expect(page.locator('.listing-card').first().locator('.listing-pay')).toContainText('SALARY')
 })
 
 test('applying respects the game age policy on the listing', async ({ page }) => {
@@ -57,7 +58,10 @@ test('applying respects the game age policy on the listing', async ({ page }) =>
   await page.getByPlaceholder('Role, organization, or game').fill('editor')
   await expect(page.getByRole('heading', { name: 'Short-form Video Editor' })).toBeVisible()
   await page.getByRole('button', { name: 'View details' }).click()
-  await expect(page.getByText('Paid · $25–35 USD / hour')).toBeVisible()
+  // The org's salary for the position is stated up front, next to its pay terms.
+  await expect(page.locator('.detail-highlight')).toContainText('SALARY')
+  await expect(page.locator('.detail-highlight')).toContainText('25–35 USD / hour')
+  await expect(page.getByText('Paid freelance, invoiced monthly. The test edit is paid at the agreed rate.')).toBeVisible()
   await expect(page.getByText(/Posted Oct 20, 2026 · Expires Nov 19, 2026/)).toBeVisible()
 
   // No age saved yet: the apply action is gated.
@@ -106,6 +110,9 @@ test('orgs can find players and message them in the workspace inbox', async ({ p
   await expect(mika.getByRole('button', { name: 'Message player' })).toBeEnabled()
   await expect(warzone.getByRole('button', { name: 'Message player' })).toBeDisabled()
   await expect(warzone.getByText(/Below the Call of Duty/i)).toBeVisible()
+  // Players state the salary they are looking for, and orgs state what they pay.
+  await expect(mika.locator('.player-pay')).toContainText('SALARY ASK')
+  await expect(mika.locator('.player-pay')).toContainText('300–500 USD / month')
 
   await mika.getByRole('button', { name: 'Message player' }).click()
   await expect(page.getByRole('heading', { name: /Build your team/i })).toBeVisible()

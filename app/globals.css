@@ -1110,3 +1110,17 @@ body { background: var(--ink); font-family: 'Manrope', system-ui, sans-serif; }
   .header-actions { gap: 7px; }
   .header-actions .button-small { white-space: nowrap; padding-inline: 9px; }
 }
+
+/* --- Pay: what a player asks for, what an org offers ---------------------- */
+.listing-pay { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 9px; }
+.listing-pay span { font-family: 'DM Mono', monospace; font-size: 8px; letter-spacing: .14em; color: #77707f; }
+.listing-pay strong { color: #f6d7da; font-size: 12px; font-weight: 600; letter-spacing: -.01em; }
+.player-pay {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px;
+  padding: 10px 13px; border: 1px solid rgba(255, 61, 74, .26); border-radius: 12px;
+  background: rgba(255, 61, 74, .07);
+}
+.player-pay span { font-family: 'DM Mono', monospace; font-size: 8.5px; letter-spacing: .14em; color: #ff9aa0; }
+.player-pay strong { color: #ffe4e6; font-size: 13px; font-weight: 650; letter-spacing: -.01em; }
+.pay-note { margin: 10px 0 0; color: #8a8290; font-size: 10.5px; line-height: 1.6; }
+@media (max-width: 680px) { .player-pay strong { font-size: 12px; } }
