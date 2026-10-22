@@ -887,6 +887,13 @@ body { background: var(--ink); font-family: 'Manrope', system-ui, sans-serif; }
 .path-card p { margin: 0; max-width: 34ch; color: #aba3b0; font-size: 12.5px; line-height: 1.65; }
 .path-cta { display: inline-flex; align-items: center; gap: 8px; margin-top: auto; color: #fff; font-size: 11.5px; font-weight: 650; }
 
+.age-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: -12px 0 24px; }
+.age-strip span {
+  display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, .1); border-radius: 999px;
+  background: rgba(255, 255, 255, .035); color: #b8b0be; font-size: 10.5px;
+}
+.age-strip strong { color: #ff9aa0; font-family: 'DM Mono', monospace; font-size: 10.5px; letter-spacing: .02em; }
 .player-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .player-card {
   display: flex; flex-direction: column; gap: 14px; padding: 20px;
@@ -1088,6 +1095,7 @@ body { background: var(--ink); font-family: 'Manrope', system-ui, sans-serif; }
   .dual-paths { grid-template-columns: 1fr; padding-block: 4px 26px; }
   .path-card { min-height: 0; padding: 22px; }
   .player-grid { grid-template-columns: 1fr; }
+  .age-strip { margin-top: -8px; }
   .player-card { padding: 16px; }
   .messages-layout, .messages-layout.compact { grid-template-columns: 1fr; }
   .thread-list { max-height: 250px; }

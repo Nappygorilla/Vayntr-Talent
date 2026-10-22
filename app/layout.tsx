@@ -5,7 +5,7 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'VAYNTR Talent — Find your place in the game',
   description:
-    'Discover esports and creator opportunities with clear terms, candidate control, and safety-first guidance. VAYNTR Talent is currently a demo.',
+    'Players looking for an org and organizations looking for players. Every role lists its terms, and each game’s minimum age is checked against competition rules.',
   openGraph: {
     title: 'VAYNTR Talent — Find your place in the game',
     description:

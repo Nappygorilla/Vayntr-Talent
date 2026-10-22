@@ -38,7 +38,7 @@ type AgePolicy = { game: string; minAge: number; note: string; source: string }
 // Minimum ages come from each scene's competition rules, not from a platform-wide number.
 // Guardian consent is required for every minor; organisation contracts for a minor also need a guardian's signature.
 const gameAgePolicies: AgePolicy[] = [
-  { game: 'Rocket League', minAge: 13, note: 'RLCS lowered its minimum to 13 in 2024. Minors need guardian permission and a guardian at in-person events.', source: 'https://www.rocketleague.com/competitive/rules' },
+  { game: 'Rocket League', minAge: 13, note: 'RLCS lowered its minimum to 13 in 2024, so a 14-year-old can sign with an org. A guardian must consent and accompany them at in-person events.', source: 'https://www.rocketleague.com/competitive/rules' },
   { game: 'Fortnite', minAge: 13, note: 'FNCS rules set 13+, with parent or guardian permission to compete.', source: 'https://www.fortnite.com/competitive/rules-guidelines/rules-library/fortnite-championship-series-fncs-2026-official-rules' },
   { game: 'Street Fighter 6', minAge: 13, note: 'Capcom Pro Tour requires 13+ and the local game rating, with guardian consent and accompaniment.', source: 'https://sf.esports.capcom.com/cpt/2025/rules/' },
   { game: 'Apex Legends', minAge: 16, note: 'ALGS requires 16+ (17 in Japan, 18 in South Korea) and guardian consent for minors.', source: 'https://algs.ea.com/year-6-rules.pdf' },
@@ -288,7 +288,7 @@ function HomePage({ go }: { go: (page: string) => void }) {
     </section>
     <section className="section wrap home-roles-section">
       <div className="section-heading home-roles-heading">
-        <div><div className="eyebrow">OPEN NOW / SAMPLE LISTINGS</div><h2>Roles worth<br className="mobile-break" /> a closer look.</h2></div>
+        <div><div className="eyebrow">OPEN NOW / ROLES</div><h2>Roles worth<br className="mobile-break" /> a closer look.</h2></div>
         <button className="text-link" onClick={() => go('Marketplace')}>Browse all roles <span className="button-arrow" aria-hidden="true">↗</span></button>
       </div>
       <div className="home-roles">
@@ -359,7 +359,7 @@ function PlayersPage({ players: roster, onMessage, go }: { players: Player[]; on
   const visible = roster.filter((player) => `${player.name} ${player.game} ${player.role} ${player.rank} ${player.region}`.toLowerCase().includes(query.toLowerCase()) && (game === 'All games' || player.game === game))
   return <section className="page-wrap wrap">
     <SectionSwitch active="players" onSelect={(view) => { if (view !== 'players') go('Marketplace') }} />
-    <div className="page-heading"><div className="eyebrow">PLAYERS LOOKING FOR AN ORG</div><h1>Players open<br /><span>to offers.</span></h1><p>Every player here chose to be discoverable and picked the fields shown. Minimum ages follow each game’s competition rules, not one platform-wide number.</p></div>
+    <div className="page-heading"><div className="eyebrow">PLAYERS LOOKING FOR AN ORG</div><h1>Players open<br /><span>to offers.</span></h1><p>Every player here chose to be discoverable and picked the fields shown. Minimum ages follow each game’s competition rules, not one platform-wide number.</p></div><div className="age-strip"><span><strong>13+</strong> Rocket League · Fortnite</span><span><strong>16+</strong> Apex · CS2</span><span><strong>17+</strong> Overwatch · League</span><span><strong>18+</strong> Warzone · VALORANT · R6</span></div>
     <div className="search-panel"><label className="search-field"><span aria-hidden="true">⌕</span><span className="sr-only">Search players, games, or roles</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Player, game, role, or region" /></label><label className="select-field"><span className="sr-only">Filter by game</span><select value={game} onChange={(event) => setGame(event.target.value)}>{games.map((option) => <option key={option}>{option}</option>)}</select></label><span className="result-count">{visible.length} player{visible.length === 1 ? '' : 's'}</span></div>
     {visible.length ? <div className="player-grid">{visible.map((player) => <PlayerCard key={player.id} player={player} onMessage={() => onMessage(player)} />)}</div> : <div className="empty-state"><span aria-hidden="true">⌕</span><h2>No players found</h2><p>Try another name, game, role, or region.</p></div>}
     <div className="privacy-note"><strong>Opt-in only.</strong><p>Player cards appear here only when discovery is on. Contact stays inside the platform so both sides keep a record of what was agreed.</p><button className="text-link" onClick={() => go('Trust & safety')}>Read the age rules <span className="button-arrow" aria-hidden="true">↗</span></button></div>
