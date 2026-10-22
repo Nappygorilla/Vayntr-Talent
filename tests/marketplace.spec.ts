@@ -378,3 +378,74 @@ test('an account can export its data and delete itself', async ({ page }) => {
   await page.locator('.auth-form').getByRole('button', { name: /^Log in/ }).click()
   await expect(page.locator('.field-error')).toContainText('Email or password is incorrect')
 })
+
+async function buttonOffset(locator: import('@playwright/test').Locator) {
+  return locator.evaluate((el) => {
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(el).transform)
+    return { x: Math.round(matrix.m41 * 100) / 100, y: Math.round(matrix.m42 * 100) / 100 }
+  })
+}
+
+test('primary buttons drift toward the pointer and stay inside a few pixels', async ({ page }) => {
+  await page.goto('/')
+  const button = page.getByRole('button', { name: /Explore opportunities/ }).first()
+  const box = await button.boundingBox()
+  if (!box) throw new Error('The primary button is not visible')
+
+  // Pointer near the right edge: the button leans right, but only by a little.
+  // The listener attaches on hydration, so retry until the button responds.
+  await expect.poll(async () => {
+    await page.mouse.move(box.x + box.width - 6, box.y + box.height / 2, { steps: 3 })
+    return (await buttonOffset(button)).x
+  }, { timeout: 15_000 }).toBeGreaterThan(1)
+
+  const pulled = await buttonOffset(button)
+  expect(pulled.x).toBeLessThanOrEqual(6)
+  expect(pulled.y).toBeGreaterThanOrEqual(-6)
+  expect(pulled.y).toBeLessThanOrEqual(0)
+
+  // Pointer near the left edge: it leans the other way, still within bounds.
+  await page.mouse.move(box.x + 6, box.y + box.height * 0.85, { steps: 3 })
+  await expect.poll(async () => (await buttonOffset(button)).x, { timeout: 3000 }).toBeLessThan(-1)
+  const pushed = await buttonOffset(button)
+  expect(pushed.x).toBeGreaterThanOrEqual(-6)
+  expect(Math.abs(pushed.y)).toBeLessThanOrEqual(6)
+
+  // Leaving the button returns it to rest and drops the inline motion styles.
+  await page.mouse.move(box.x - 120, box.y - 120, { steps: 3 })
+  await expect.poll(async () => (await buttonOffset(button)).x, { timeout: 3000 }).toBe(0)
+  await expect.poll(() => button.evaluate((el) => el.getAttribute('style')), { timeout: 3000 }).toBe('')
+})
+
+test('a button mounted after a click is pulled too', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Trust & safety' }).last().click()
+  await page.getByRole('button', { name: /Report a listing or account/i }).click()
+
+  const dialog = page.getByRole('dialog', { name: /Help us understand/i })
+  const submit = dialog.getByRole('button', { name: 'Submit report' })
+  const box = await submit.boundingBox()
+  if (!box) throw new Error('The dialog button is not visible')
+
+  await expect.poll(async () => {
+    await page.mouse.move(box.x + box.width - 6, box.y + box.height / 2, { steps: 3 })
+    return (await buttonOffset(submit)).x
+  }).toBeGreaterThan(1)
+  expect(Math.abs((await buttonOffset(submit)).x)).toBeLessThanOrEqual(6)
+})
+
+test.describe('reduced motion', () => {
+  test.use({ reducedMotion: 'reduce' })
+
+  test('magnetic hover is skipped when reduced motion is requested', async ({ page }) => {
+    await page.goto('/')
+    const button = page.getByRole('button', { name: /Explore opportunities/ }).first()
+    const box = await button.boundingBox()
+    if (!box) throw new Error('The primary button is not visible')
+
+    await page.mouse.move(box.x + box.width - 6, box.y + box.height / 2, { steps: 3 })
+    // The stylesheet's hover lift proves the pointer is on the button; the pull is absent.
+    await expect(button).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -1)')
+    expect(await button.evaluate((el) => el.getAttribute('style'))).toBe(null)
+  })
+})

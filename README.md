@@ -38,6 +38,7 @@ npm run test:e2e
 - A US privacy notice covering what is collected, the no-sale/no-tracking position, retention, minors, and the access, correction, deletion, opt-out, limited-use, non-discrimination, authorized-agent and appeal rights of CCPA/CPRA and other state laws.
 - Report dialog, feedback panel and moderator queue exist as UI. Their copy states that a report or note is saved on this device — it does not claim to have reached moderators or the product team.
 - Reserved future ad inventory. **No ad network, ad scripts, tracking, sponsored placements, or ad targeting are installed.** Keep ads out of applications, private profiles, candidate data, and audience targeting. Establish audience age policy, consent and privacy reviews before any future advertising.
+- **A weak magnetic pull on the primary buttons.** With a mouse or trackpad, each button leans a few pixels toward the cursor — proportional to how far the pointer is from its center and hard-capped at 6px in any direction — then settles back when the pointer leaves. It is delegated, so buttons that appear after a click move too. Disabled buttons never move, and the whole effect is skipped for touch input and for anyone whose system asks for reduced motion.
 - Responsive semantic controls, labels, keyboard focus treatment, reduced-motion support, and empty states.
 
 ## Critical implementation limits

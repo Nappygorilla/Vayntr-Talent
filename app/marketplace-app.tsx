@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Check, CircleAlert, Plus, Search, ShieldCheck, UserRound } from 'lucide-react'
 import { PrivacyPage, SignInPage, SignUpPage, deleteAccount, endSession, restoreSession, roleLabels, updateAccount, type Account } from './auth'
+import { useMagneticButtons } from './magnetic'
 type Listing = {
   id: string; title: string; org: string; mark: string; category: string; game: string; openings: number
   engagement: string; salary: string; payTerms: string; hours: string; schedule: string; location: string; eligibility: string
@@ -70,6 +71,7 @@ const commandActions = [
 ]
 
 function App() {
+  useMagneticButtons()
   const [page, setPage] = useState('Home')
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All roles')
