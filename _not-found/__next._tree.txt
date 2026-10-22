@@ -1,5 +1,5 @@
-:HL["/Vayntr-Talent/_next/static/chunks/2sskfe1-x_ml3.css","style"]
+:HL["/Vayntr-Talent/_next/static/chunks/439i3teyasi0w.css","style"]
 :HL["https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap","style"]
 2:[["children",{"s":"__PAGE__","h":160}]]
 1:[["children",{"s":"/_not-found","h":96,"c":"$Q2"}]]
-0:{"b":"nCcNc9zAk3haUpZuzHcnG","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
+0:{"b":"d7FXRfJWqWKoI5_VkY3vH","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
