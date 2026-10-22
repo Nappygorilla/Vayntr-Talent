@@ -88,7 +88,7 @@ function App() {
   return <div className="app-shell">
     <div className="demo-strip"><span className="demo-pulse" /> DEMO ENVIRONMENT <span className="strip-copy">Sample listings and local-only interactions · Not connected to an account or database</span></div>
     <header className="header">
-      <a className="brand" href="#home" onClick={(event) => { event.preventDefault(); go('Home') }} aria-label="VAYNTR Talent home"><span className="brand-symbol">V<span>.</span></span><span className="brand-text">VAYNTR<span>TALENT</span></span></a>
+      <a className="brand" href="#home" onClick={(event) => { event.preventDefault(); go('Home') }} aria-label="VAYNTR Talent home"><span className="brand-symbol" aria-hidden="true"><svg viewBox="0 0 28 28" focusable="false"><path d="M4 4 L14 24 L24 4" /><circle cx="23.5" cy="23.5" r="1.8" /></svg></span><span className="brand-text">VAYNTR<span>TALENT</span></span></a>
       <button className="menu-button" aria-label="Toggle navigation" aria-expanded={mobileMenu} aria-controls="primary-nav" onClick={() => setMobileMenu(!mobileMenu)}>☰</button>
       <nav id="primary-nav" className={mobileMenu ? 'nav open' : 'nav'} aria-label="Main navigation">{pages.slice(0, 4).map((item) => <button key={item} className={page === item ? 'nav-item active' : 'nav-item'} onClick={() => go(item)}>{item}</button>)}</nav>
       <button className="command-trigger" type="button" aria-label="Open quick navigation (Ctrl or Command plus K)" aria-keyshortcuts="Control+K Meta+K" onClick={() => { setCommandQuery(''); setCommandSelection(0); setCommandOpen(true) }}><span className="command-trigger-icon" aria-hidden="true">⌕</span><span className="command-trigger-label">Quick jump</span><kbd>Ctrl K</kbd></button>
@@ -107,7 +107,7 @@ function App() {
     {page === 'Moderation' && <ModerationPage onNotice={showNotice} onReport={() => setReportOpen(true)} />}
     {page === 'Resources' && <ResourcesPage />}
     
-    <footer className="footer"><div className="footer-main"><div><a className="brand footer-brand" href="#home" onClick={(event) => { event.preventDefault(); go('Home') }}><span className="brand-symbol">V<span>.</span></span><span className="brand-text">VAYNTR<span>TALENT</span></span></a><p className="footer-tagline">Find your next team. Build with care.</p></div><div className="footer-nav"><button onClick={() => go('Marketplace')}>Marketplace</button><button onClick={() => go('Organizations')}>Organizations</button><button onClick={() => go('Resources')}>Resources</button><button onClick={() => go('Trust & safety')}>Trust &amp; safety</button><button onClick={() => go('For organizations')}>For organizations</button><button onClick={() => go('My profile')}>My profile</button><button onClick={() => go('Applications')}>Applications</button></div><div className="footer-contact"><strong>Need help?</strong><a href="mailto:support@vayntr.example">Contact support</a><span>Demo contact: replace before launch</span></div></div><div className="footer-bottom"><span>© 2026 VAYNTR Talent · Demo build</span><span>Recruitment is not guaranteed. Evaluate every opportunity carefully.</span><button onClick={() => go('Trust & safety')}>Privacy &amp; safety</button></div></footer>
+    <footer className="footer"><div className="footer-main"><div><a className="brand footer-brand" href="#home" onClick={(event) => { event.preventDefault(); go('Home') }}><span className="brand-symbol" aria-hidden="true"><svg viewBox="0 0 28 28" focusable="false"><path d="M4 4 L14 24 L24 4" /><circle cx="23.5" cy="23.5" r="1.8" /></svg></span><span className="brand-text">VAYNTR<span>TALENT</span></span></a><p className="footer-tagline">Find your next team. Build with care.</p></div><div className="footer-nav"><button onClick={() => go('Marketplace')}>Marketplace</button><button onClick={() => go('Organizations')}>Organizations</button><button onClick={() => go('Resources')}>Resources</button><button onClick={() => go('Trust & safety')}>Trust &amp; safety</button><button onClick={() => go('For organizations')}>For organizations</button><button onClick={() => go('My profile')}>My profile</button><button onClick={() => go('Applications')}>Applications</button></div><div className="footer-contact"><strong>Need help?</strong><a href="mailto:support@vayntr.example">Contact support</a><span>Demo contact: replace before launch</span></div></div><div className="footer-bottom"><span>© 2026 VAYNTR Talent · Demo build</span><span>Recruitment is not guaranteed. Evaluate every opportunity carefully.</span><button onClick={() => go('Trust & safety')}>Privacy &amp; safety</button></div></footer>
     {reportOpen && <ReportDialog onClose={() => setReportOpen(false)} onSubmit={(reason) => { setReportOpen(false); showNotice(`Demo report submitted (${reason}). No real moderation queue is connected.`) }} />}
     <FeedbackWidget onNotice={showNotice} open={feedbackOpen} setOpen={setFeedbackOpen} />
   </div>
@@ -115,68 +115,72 @@ function App() {
 function HomePage({ go }: { go: (page: string) => void }) {
   return <>
     <main className="home-page">
-      <section className="home-hero wrap">
-        <div className="home-hero-topline">
-          <span><i /> AN INDEPENDENT TALENT NETWORK</span>
-          <span className="home-hero-edition">V / TALENT — 001</span>
-        </div>
-        <div className="home-hero-main">
-          <div className="home-hero-copy">
-            <div className="eyebrow"><span className="eyebrow-line" /> MADE FOR YOUR NEXT MOVE</div>
-            <h1>Find your place<br />in the <span>game.</span></h1>
-            <p className="hero-lead">The next team. The next creator. The next opportunity. Find people who get what you’re building — without the noise.</p>
-            <div className="hero-actions">
-              <button className="button button-red" onClick={() => go('Marketplace')}>Explore opportunities <span className="button-arrow" aria-hidden="true">↗</span></button>
-              <button className="button button-outline" onClick={() => go('For organizations')}>For organizations</button>
-            </div>
-            <div className="home-hero-footnote"><span>01</span><p>Browse first. Share details only when you choose.</p></div>
+      <section className="home-stage">
+        <div className="wrap home-stage-inner">
+          <div className="home-stage-topline">
+            <span><i /> VAYNTR / TALENT NETWORK</span>
+            <span>OPEN INDEX — 001</span>
           </div>
-          <div className="home-hero-art" aria-hidden="true">
-            <div className="home-art-topline"><span>VAYNTR / VT—01</span><span>FIND · CONNECT · BUILD</span></div>
-            <svg viewBox="0 0 600 590" role="presentation" focusable="false">
+          <div className="home-stage-body">
+            <div className="home-stage-index" aria-hidden="true">01 / PLAYERS<br />02 / CREATORS<br />03 / TEAMS</div>
+            <svg className="home-stage-v" viewBox="0 0 600 500" aria-hidden="true" focusable="false">
               <defs>
-                <linearGradient id="vayntr-ribbon" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#ff5e67" />
-                  <stop offset="48%" stopColor="#df1d2a" />
-                  <stop offset="100%" stopColor="#671019" />
+                <linearGradient id="home-v-gradient" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#ff606a" />
+                  <stop offset="52%" stopColor="#d91f2c" />
+                  <stop offset="100%" stopColor="#68101a" />
                 </linearGradient>
-                <radialGradient id="vayntr-glow">
-                  <stop offset="0%" stopColor="#b51d2c" stopOpacity=".42" />
-                  <stop offset="100%" stopColor="#0a0a0c" stopOpacity="0" />
-                </radialGradient>
               </defs>
-              <circle cx="305" cy="292" r="250" fill="url(#vayntr-glow)" />
-              <g fill="none" stroke="#f14a55" strokeOpacity=".32">
-                <circle cx="305" cy="292" r="216" />
-                <circle cx="305" cy="292" r="170" strokeOpacity=".42" />
-                <ellipse cx="305" cy="292" rx="252" ry="114" transform="rotate(-42 305 292)" />
-                <path d="M26 292H574M305 12V572" strokeOpacity=".2" />
-                <path d="M70 105L530 480M90 490L515 90" strokeOpacity=".18" />
-              </g>
-              <path d="M160 105H281L424 378H302Z" fill="url(#vayntr-ribbon)" />
-              <path d="M281 105H402L259 378H138Z" fill="#8f1421" fillOpacity=".94" />
-              <path d="M319 378H440L497 271H376Z" fill="#ee2d39" />
-              <path d="M104 420H224L269 335H149Z" fill="#c31c2b" fillOpacity=".8" />
-              <path d="M153 105L301 386" fill="none" stroke="#ff9aa0" strokeOpacity=".72" strokeWidth="2" />
-              <path d="M286 105L143 378" fill="none" stroke="#ff6972" strokeOpacity=".55" strokeWidth="2" />
-              <path d="M84 451L232 451M386 142L505 142M421 471L514 471" stroke="#f34b56" strokeOpacity=".75" />
-              <g fill="#f3eef0" fontFamily="monospace" fontSize="10" letterSpacing="3">
-                <text x="70" y="476">PLAY YOUR PART</text>
-                <text x="395" y="128">NEXT / 01</text>
-              </g>
-              <circle cx="305" cy="292" r="236" fill="none" stroke="#ff6570" strokeOpacity=".22" strokeDasharray="1 10" />
+              <path d="M70 70 H210 L300 300 L390 70 H530 L338 430 H262 Z" fill="url(#home-v-gradient)" />
+              <path d="M133 96 H188 L300 370 L412 96 H467" fill="none" stroke="#ff8b92" strokeWidth="7" strokeOpacity=".48" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <div className="home-art-caption"><span>01 /</span><span>A DIFFERENT KIND<br />OF STARTING POINT.</span><i>↗</i></div>
-            <span className="home-art-vertical">PLAYERS — CREATORS — TEAMS</span>
+            <p className="home-stage-kicker">FOR THE PEOPLE BEHIND THE NEXT GREAT PLAY</p>
+            <h1>Find your<br /><span>next move.</span></h1>
+            <div className="home-stage-lower">
+              <div className="home-stage-explain">
+                <span>PLAY / CREATE / CONNECT</span>
+                <p>Meet the right people, discover opportunities with clear expectations, and build what comes next — on the player side, the creator side, or behind the scenes.</p>
+              </div>
+              <div className="home-stage-actions">
+                <button className="button button-red" onClick={() => go('Marketplace')}>Explore opportunities <span className="button-arrow" aria-hidden="true">↗</span></button>
+                <button className="button button-outline" onClick={() => go('For organizations')}>For organizations</button>
+              </div>
+            </div>
+          </div>
+          <div className="home-stage-baseline">
+            <span><b>01</b> LOOK AROUND FIRST</span>
+            <span><b>02</b> CHECK THE DETAILS</span>
+            <span><b>03</b> CHOOSE YOUR NEXT STEP</span>
           </div>
         </div>
-        <div className="home-proofline">
-          <span><b>01</b> YOUR SKILLS, YOUR STORY</span>
-          <span><b>02</b> OPPORTUNITIES WITH CONTEXT</span>
-          <span><b>03</b> SAFETY BEFORE HYPE</span>
-        </div>
-        <div className="discipline-strip" aria-label="Who VAYNTR Talent is for">
-          <span>PLAYERS</span><i aria-hidden="true">✳</i><span>CREATORS</span><i aria-hidden="true">✳</i><span>TEAMS</span><i aria-hidden="true">✳</i><span>PRODUCTION</span><i aria-hidden="true">✳</i><span>COMMUNITY</span>
+      </section>
+
+      <section className="home-lanes">
+        <div className="wrap">
+          <div className="home-lanes-heading">
+            <div>
+              <div className="eyebrow">START FROM YOUR SIDE OF THE GAME</div>
+              <h2>Different paths.<br /><span>Shared ambition.</span></h2>
+            </div>
+            <p>There is more to gaming than a leaderboard. Find a place for your skill, your craft, or your team.</p>
+          </div>
+          <div className="home-lane-list">
+            <button className="home-lane" onClick={() => go('Marketplace')}>
+              <span className="home-lane-number">01</span>
+              <span className="home-lane-copy"><strong>Players</strong><small>Find a roster, trial, or competitive support role.</small></span>
+              <i aria-hidden="true">↗</i>
+            </button>
+            <button className="home-lane" onClick={() => go('Resources')}>
+              <span className="home-lane-number">02</span>
+              <span className="home-lane-copy"><strong>Creators</strong><small>Connect your craft to editors, producers, and new work.</small></span>
+              <i aria-hidden="true">↗</i>
+            </button>
+            <button className="home-lane" onClick={() => go('For organizations')}>
+              <span className="home-lane-number">03</span>
+              <span className="home-lane-copy"><strong>Teams &amp; operators</strong><small>Explore collaborators and learn what good briefs include.</small></span>
+              <i aria-hidden="true">↗</i>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -184,10 +188,10 @@ function HomePage({ go }: { go: (page: string) => void }) {
         <div className="wrap">
           <div className="home-section-top">
             <div>
-              <div className="eyebrow">A GOOD NEXT MOVE</div>
-              <h2>Find the right fit.<br /><span>Not just any role.</span></h2>
+              <div className="eyebrow">THE OPEN INDEX / SAMPLE DATA</div>
+              <h2>Find the work.<br /><span>Know the terms.</span></h2>
             </div>
-            <p>Explore sample opportunities for players, creators, and the teams behind them. Read the details before you decide.</p>
+            <p>These are illustrative listings for the demo. Every role should explain its scope, schedule, and compensation before you commit.</p>
           </div>
           <div className="home-opening-list">
             {listings.slice(0, 4).map((item, index) => <button className="home-opening-row" key={item.id} onClick={() => go('Marketplace')}>
@@ -197,35 +201,43 @@ function HomePage({ go }: { go: (page: string) => void }) {
               <span className="home-opening-arrow" aria-hidden="true">↗</span>
             </button>)}
           </div>
-          <div className="home-opening-footer"><span>DEMO LISTINGS · SAMPLE DATA ONLY</span><button className="text-link" onClick={() => go('Marketplace')}>View every opportunity <span className="button-arrow" aria-hidden="true">↗</span></button></div>
+          <div className="home-opening-footer"><span>DEMO LISTINGS · SAMPLE DATA ONLY</span><button className="text-link" onClick={() => go('Marketplace')}>Browse all sample roles <span className="button-arrow" aria-hidden="true">↗</span></button></div>
         </div>
       </section>
 
-      <section className="home-process wrap">
-        <div className="home-process-intro">
-          <div className="eyebrow">KEEP IT HUMAN</div>
-          <h2>Good work deserves<br />a <span>clear way in.</span></h2>
-          <p>No magic shortcuts. Just a more considered starting point for meeting people, understanding opportunities, and making the next move on your terms.</p>
-          <button className="text-link" onClick={() => go('Trust & safety')}>How we think about trust <span className="button-arrow" aria-hidden="true">↗</span></button>
-        </div>
-        <div className="home-process-steps">
-          <article className="home-process-step"><span>01</span><div><h3>Find your lane.</h3><p>Explore roles, teams, and creator opportunities across the gaming world.</p></div><i aria-hidden="true">⌕</i></article>
-          <article className="home-process-step"><span>02</span><div><h3>Get the full picture.</h3><p>Check responsibilities, expectations, compensation, and who is making the offer.</p></div><i aria-hidden="true">↗</i></article>
-          <article className="home-process-step"><span>03</span><div><h3>Choose what comes next.</h3><p>Decide what to share and whether an opportunity actually fits your goals.</p></div><i aria-hidden="true">✓</i></article>
+      <section className="home-process">
+        <div className="wrap home-process-inner">
+          <div className="home-process-heading">
+            <div>
+              <div className="eyebrow">A BETTER WAY TO BEGIN</div>
+              <h2>Big goals need<br /><span>good information.</span></h2>
+            </div>
+            <p>No hype, pressure, or mystery terms. Take time to understand the opportunity and decide whether it fits the work you want to do.</p>
+          </div>
+          <div className="home-process-steps">
+            <article className="home-process-step"><span>01</span><div><h3>Find your lane.</h3><p>Start with roles, teams, and creator opportunities that match what you want to build.</p></div><i aria-hidden="true">↗</i></article>
+            <article className="home-process-step"><span>02</span><div><h3>Read the full brief.</h3><p>Look for responsibilities, hours, compensation, rights, and who is making the offer.</p></div><i aria-hidden="true">↗</i></article>
+            <article className="home-process-step"><span>03</span><div><h3>Make the call yourself.</h3><p>Share only what you choose, ask questions, and walk away from terms that do not work for you.</p></div><i aria-hidden="true">✓</i></article>
+          </div>
+          <button className="text-link home-process-link" onClick={() => go('Trust & safety')}>Read the trust &amp; safety guide <span className="button-arrow" aria-hidden="true">↗</span></button>
         </div>
       </section>
 
       <section className="home-field-notes">
         <div className="wrap">
-          <div className="home-section-top">
-            <div><div className="eyebrow">THE EXTRA ROUND</div><h2>Notes for what<br /><span>comes next.</span></h2></div>
-            <button className="text-link" onClick={() => go('Resources')}>All resources <span className="button-arrow" aria-hidden="true">↗</span></button>
+          <div className="home-field-header">
+            <div>
+              <div className="eyebrow">FIELD NOTES / THE WORK BETWEEN THE HIGHLIGHTS</div>
+              <h2>Better questions.<br /><span>Stronger moves.</span></h2>
+            </div>
+            <p>Practical starting points for improving, publishing, and working together — without promises of overnight success.</p>
           </div>
           <div className="home-notes-list">
-            <button className="home-note-row" onClick={() => go('Resources')}><span>FIELD NOTE / 001</span><strong>Review the round, not just the result.</strong><small>A practical VOD review starting point for players and teams.</small><i aria-hidden="true">↗</i></button>
-            <button className="home-note-row" onClick={() => go('Resources')}><span>CREATOR NOTE / 002</span><strong>Build a content format you can sustain.</strong><small>Turn a creative idea into a simple, repeatable workflow.</small><i aria-hidden="true">↗</i></button>
+            <button className="home-note-row" onClick={() => go('Resources')}><span>PLAYER NOTE / 001</span><strong>Review the round, not just the result.</strong><small>A practical VOD review starting point for players and teams.</small><i aria-hidden="true">↗</i></button>
+            <button className="home-note-row" onClick={() => go('Resources')}><span>CREATOR NOTE / 002</span><strong>Build a format you can sustain.</strong><small>Turn an idea into a repeatable, realistic publishing workflow.</small><i aria-hidden="true">↗</i></button>
             <button className="home-note-row" onClick={() => go('Trust & safety')}><span>SAFETY NOTE / 003</span><strong>Look beyond the pitch.</strong><small>Questions to ask before trusting a team, deal, or opportunity.</small><i aria-hidden="true">↗</i></button>
           </div>
+          <div className="home-notes-footer"><span>LEARN BEFORE YOU LEAP.</span><button className="text-link" onClick={() => go('Resources')}>All resources <span className="button-arrow" aria-hidden="true">↗</span></button></div>
         </div>
       </section>
 
@@ -233,8 +245,8 @@ function HomePage({ go }: { go: (page: string) => void }) {
         <div className="home-finale-art" aria-hidden="true">V<span>.</span></div>
         <div className="wrap home-finale-inner">
           <div className="eyebrow">YOUR NEXT CHAPTER STARTS HERE</div>
-          <h2>Make your<br /><span>next move.</span></h2>
-          <div className="home-finale-bottom"><p>Start by looking around. The right opportunity should make sense before you share a thing.</p><button className="button button-red" onClick={() => go('Marketplace')}>Explore opportunities <span className="button-arrow" aria-hidden="true">↗</span></button></div>
+          <h2>Make the<br /><span>next move.</span></h2>
+          <div className="home-finale-bottom"><p>Start by looking around. A good opportunity should make sense before you share a thing.</p><button className="button button-red" onClick={() => go('Marketplace')}>Explore opportunities <span className="button-arrow" aria-hidden="true">↗</span></button></div>
         </div>
       </section>
     </main>
