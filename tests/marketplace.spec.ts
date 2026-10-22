@@ -1,0 +1,66 @@
+import { expect, test } from '@playwright/test'
+
+test('candidate marketplace journey and organization demo surfaces', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: /Find your place in the game/i })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Explore opportunities' }).first().click()
+  await expect(page.getByRole('heading', { name: /Find your next role/i })).toBeVisible()
+  await expect(page.getByText('5 sample roles')).toBeVisible()
+  await page.getByPlaceholder('Role, organization, or game').fill('editor')
+  await expect(page.getByRole('heading', { name: 'Short-form Video Editor' })).toBeVisible()
+  await page.getByRole('button', { name: 'View details' }).click()
+  await expect(page.getByText('Paid · $25–35 USD / hour')).toBeVisible()
+  await expect(page.getByText(/Posted Oct 20, 2026 · Expires Nov 19, 2026/)).toBeVisible()
+  await page.getByRole('button', { name: 'Apply through platform' }).click()
+  await expect(page.getByRole('status')).toContainText('no organization was contacted')
+
+  await page.getByRole('button', { name: 'Report listing' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByRole('button', { name: 'Submit demo report' }).click()
+  await expect(page.getByRole('status')).toContainText('No real moderation queue')
+
+  await page.getByRole('button', { name: 'Block organization' }).click()
+  await expect(page.getByRole('button', { name: 'Unblock organization' })).toBeVisible()
+  await page.getByRole('button', { name: 'Unblock organization' }).click()
+  await expect(page.getByRole('button', { name: 'Block organization' })).toBeVisible()
+
+  await page.getByRole('button', { name: /Sign in/ }).click()
+  await expect(page.getByRole('heading', { name: /Your path. Your terms./ })).toBeVisible()
+  const visibilitySwitch = page.getByRole('switch', { name: 'Allow candidate discovery' })
+  await expect(visibilitySwitch).toHaveAttribute('aria-checked', 'false')
+  await visibilitySwitch.click()
+  await expect(visibilitySwitch).toHaveAttribute('aria-checked', 'true')
+  await page.getByRole('button', { name: 'Save demo profile' }).click()
+  await expect(page.getByRole('status')).toContainText('page memory only')
+
+  await page.getByRole('button', { name: /Explore roles/ }).click()
+  await page.getByRole('button', { name: 'View details' }).click()
+  await page.getByRole('button', { name: 'Applied in demo' }).waitFor().catch(async () => {
+    await page.getByRole('button', { name: 'Apply through platform' }).click()
+  })
+  await page.getByRole('button', { name: /Sign in/ }).click()
+  await page.getByRole('button', { name: /Explore roles/ }).click()
+  await page.getByRole('button', { name: 'Applications' }).click()
+  await expect(page.getByText('Short-form Video Editor', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Withdraw' }).last().click()
+  await expect(page.getByRole('status')).toContainText('withdrawn locally')
+
+  await page.getByRole('button', { name: 'For organizations' }).click()
+  await expect(page.getByText(/Real organization scoping, authentication and audit logs are not configured/)).toBeVisible()
+  await expect(page.getByText(/No verification has been performed/)).toBeVisible()
+})
+
+test('search, category filter, resources, and moderation disclosure', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: /Explore roles/ }).click()
+  await page.getByLabel('Filter by role category').selectOption('Analyst')
+  await expect(page.getByRole('heading', { name: 'Rocket League Analyst' })).toBeVisible()
+  await expect(page.getByText('1 sample roles')).toBeVisible()
+  await page.getByRole('button', { name: 'Resources' }).click()
+  await expect(page.getByRole('heading', { name: /A useful VOD review starts with a question/i })).toBeVisible()
+  await expect(page.getByText(/REVIEWED OCTOBER 22, 2026/)).toBeVisible()
+  await page.getByRole('button', { name: 'Trust & safety' }).click()
+  await page.getByRole('button', { name: /Moderator review dashboard/ }).click()
+  await expect(page.getByText(/This non-authenticated mockup/)).toBeVisible()
+})
