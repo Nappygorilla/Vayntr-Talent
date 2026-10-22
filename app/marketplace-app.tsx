@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Search, ShieldCheck, UserRound } from 'lucide-react'
 type Listing = {
   id: string; title: string; org: string; mark: string; category: string; game: string; openings: number
   engagement: string; compensation: string; hours: string; schedule: string; location: string; eligibility: string
@@ -118,7 +119,7 @@ function HomePage({ go }: { go: (page: string) => void }) {
       <div className="hero-grid">
         <div className="hero-copy">
           <div className="eyebrow"><span className="eyebrow-line" /> TALENT, WITHOUT THE NOISE</div>
-          <h1>Find your place<br />in the <span>game.</span></h1>
+          <h1>Find your<br />place in the<br /><span>game.</span></h1>
           <p className="hero-lead">A more thoughtful way for esports organizations and creator teams to meet the people they need.</p>
           <div className="hero-actions">
             <button className="button button-red" onClick={() => go('Marketplace')}>Explore opportunities <span className="button-arrow" aria-hidden="true">↗</span></button>
@@ -135,6 +136,8 @@ function HomePage({ go }: { go: (page: string) => void }) {
           <div className="hero-slash slash-two" aria-hidden="true" />
           <div className="hero-core" aria-hidden="true">V<span>.</span></div>
           <div className="hero-art-signal"><span>FIND YOUR<br />NEXT PLAY</span><i aria-hidden="true">↗</i></div>
+          <div className="float-card card-one"><span className="mini-icon" aria-hidden="true">⌁</span><div><b>Analyst · Northstar</b><small>Paid trial · 4–6 hrs/week</small></div></div>
+          <div className="float-card card-two"><span className="mini-dot" aria-hidden="true" /><div><b>Editor · PixelForge</b><small>Paid · $25–35 / hour</small></div></div>
           <span className="hero-side-label">FIND&nbsp; / &nbsp;CONNECT&nbsp; / &nbsp;BUILD</span>
           <span className="visual-caption">BUILT FOR THE NEXT PLAY</span>
         </div>
@@ -145,7 +148,11 @@ function HomePage({ go }: { go: (page: string) => void }) {
         <span><i>03</i> Ask questions. Verify independently.</span>
       </div>
       <div className="discipline-strip" aria-label="Who VAYNTR Talent is for">
-        <span>PLAYERS</span><i aria-hidden="true">✳</i><span>CREATORS</span><i aria-hidden="true">✳</i><span>TEAMS</span><i aria-hidden="true">✳</i><span>PRODUCTION</span><i aria-hidden="true">✳</i><span>COMMUNITY</span>
+        <div className="discipline-track">
+          {[0, 1].map((copy) => <div className="discipline-group" key={copy} aria-hidden={copy === 1 ? 'true' : undefined}>
+            <span>PLAYERS</span><i aria-hidden="true">✳</i><span>CREATORS</span><i aria-hidden="true">✳</i><span>TEAMS</span><i aria-hidden="true">✳</i><span>PRODUCTION</span><i aria-hidden="true">✳</i><span>COMMUNITY</span><i aria-hidden="true">✳</i>
+          </div>)}
+        </div>
       </div>
     </section>
     <section className="section wrap">
@@ -156,25 +163,40 @@ function HomePage({ go }: { go: (page: string) => void }) {
       <div className="feature-grid">
         <article className="feature-card">
           <span className="feature-index">01 / CANDIDATES</span>
-          <div className="feature-icon" aria-hidden="true">◎</div>
+          <div className="feature-icon" aria-hidden="true"><UserRound size={21} strokeWidth={1.7} /></div>
           <h3>Put your work first.</h3>
           <p>Build a profile around your skills, experience, and goals. Keep it private until you decide otherwise.</p>
           <button className="text-link" onClick={() => go('My profile')}>Create a demo profile <span className="button-arrow" aria-hidden="true">↗</span></button>
         </article>
         <article className="feature-card featured">
           <span className="feature-index">02 / OPPORTUNITIES</span>
-          <div className="feature-icon" aria-hidden="true">⌕</div>
+          <div className="feature-icon" aria-hidden="true"><Search size={21} strokeWidth={1.7} /></div>
           <h3>Know what you’re applying for.</h3>
           <p>Browse roles with clear expectations on pay, hours, location, and how the process works.</p>
           <button className="text-link" onClick={() => go('Marketplace')}>Find a role <span className="button-arrow" aria-hidden="true">↗</span></button>
         </article>
         <article className="feature-card">
           <span className="feature-index">03 / TRUST</span>
-          <div className="feature-icon" aria-hidden="true">◇</div>
+          <div className="feature-icon" aria-hidden="true"><ShieldCheck size={21} strokeWidth={1.7} /></div>
           <h3>Take safety seriously.</h3>
           <p>Learn how to assess offers, protect your information, and report behavior that crosses a line.</p>
           <button className="text-link" onClick={() => go('Trust & safety')}>Our safety approach <span className="button-arrow" aria-hidden="true">↗</span></button>
         </article>
+      </div>
+    </section>
+    <section className="section wrap home-roles-section">
+      <div className="section-heading home-roles-heading">
+        <div><div className="eyebrow">OPEN NOW / SAMPLE LISTINGS</div><h2>Roles worth<br className="mobile-break" /> a closer look.</h2></div>
+        <button className="text-link" onClick={() => go('Marketplace')}>Browse all roles <span className="button-arrow" aria-hidden="true">↗</span></button>
+      </div>
+      <div className="home-roles">
+        {listings.slice(0, 3).map((item) => <article className="home-role" key={item.id}>
+          <div className="home-role-top"><span className="org-mark">{item.mark}</span><span className="home-role-pay">{item.compensation}</span></div>
+          <h3>{item.title}</h3>
+          <p>{item.org} · {item.location}</p>
+          <div className="listing-tags"><span>{item.category}</span><span>{item.engagement}</span></div>
+          <button className="home-role-action" onClick={() => go('Marketplace')}>View role <span className="button-arrow" aria-hidden="true">↗</span></button>
+        </article>)}
       </div>
     </section>
     <section className="dark-band">

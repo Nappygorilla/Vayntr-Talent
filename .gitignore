@@ -30,3 +30,9 @@ out/
 # Playwright
 playwright-report/
 test-results/
+/freebuff-sites-build/
+/.open-next/
+/.wrangler/
+/artifacts/
+/freebuff.wrangler.jsonc
+/freebuff.open-next.config.ts

@@ -25,9 +25,12 @@ test('button arrows rotate right on hover and return when the pointer leaves', a
 
 test('quick navigation opens with Ctrl+K and routes to a searched page', async ({ page }) => {
   await page.goto('/')
-  await page.keyboard.press('Control+k')
   const dialog = page.getByRole('dialog', { name: 'Quick navigation' })
-  await expect(dialog).toBeVisible()
+  // The shortcut is a client-side listener, so retry the press until the app has hydrated.
+  await expect.poll(async () => {
+    await page.keyboard.press('Control+k')
+    return dialog.isVisible()
+  }, { timeout: 15_000 }).toBe(true)
 
   const search = page.getByRole('combobox', { name: 'Search pages and actions' })
   await search.fill('resources')
@@ -120,16 +123,17 @@ test('feedback micro-interaction captures a local demo response without claiming
 })
 
 
-test('editorial redesign uses open sections instead of placeholder ad blocks and boxed feature cards', async ({ page }) => {
+test('home page uses the redesigned surfaces instead of placeholder ad blocks', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Find your place in the game/i })).toBeVisible()
-  await expect(page.locator('.discipline-strip')).toBeVisible()
+  await expect(page.locator('.discipline-track')).toBeVisible()
   await expect(page.getByText(/TOP BANNER|LEADERBOARD|SIDEBAR · 300 × 250/)).toHaveCount(0)
+  await expect(page.locator('.hero-visual .float-card')).toHaveCount(2)
+  await expect(page.locator('.home-role')).toHaveCount(3)
   const feature = page.locator('.feature-card').first()
-  await expect(feature).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-  await expect(feature).toHaveCSS('border-top-width', '0px')
+  await expect(feature).toHaveCSS('border-radius', '20px')
+  await expect(feature).toHaveCSS('border-top-width', '1px')
   await page.getByRole('button', { name: /Explore roles/ }).click()
   const listing = page.locator('.listing-card').first()
-  await expect(listing).toHaveCSS('border-left-width', '0px')
-  await expect(listing).toHaveCSS('border-right-width', '0px')
+  await expect(listing).toHaveCSS('border-radius', '18px')
 })
