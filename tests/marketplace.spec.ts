@@ -163,7 +163,7 @@ test('home page uses the redesigned surfaces and only previews real roles', asyn
 
 test('anyone 13 or older can create a free player account with guardian consent', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Create free account' }).click()
+  await page.getByRole('button', { name: 'Join free' }).click()
   await expect(page.getByRole('heading', { name: /Create a free account/i })).toBeVisible()
 
   // No account type chosen yet: the flow does not advance.
@@ -209,7 +209,7 @@ test('anyone 13 or older can create a free player account with guardian consent'
 
 test('children under 13 cannot create an account', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Create free account' }).click()
+  await page.getByRole('button', { name: 'Join free' }).click()
   await page.locator('.role-choices').getByRole('button', { name: /^Content creator/ }).click()
   await page.getByRole('button', { name: /^Continue/ }).click()
   await page.getByPlaceholder('e.g. the name you compete under').fill('Too Young')
@@ -224,7 +224,7 @@ test('children under 13 cannot create an account', async ({ page }) => {
 
 test('an organization signs up free and gets its own workspace', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Create free account' }).click()
+  await page.getByRole('button', { name: 'Join free' }).click()
   await page.locator('.role-choices').getByRole('button', { name: /^Esports organization/ }).click()
   await page.getByRole('button', { name: /^Continue/ }).click()
   await page.getByPlaceholder('e.g. your team or studio name').fill('Harbor Nine')
