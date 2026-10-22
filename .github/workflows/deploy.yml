@@ -45,7 +45,7 @@ jobs:
             echo 'Expected the compiled VAYNTR Talent homepage in out/index.html.'
             exit 1
           fi
-          readme_file="$(find out -type f \\( -iname 'README.md' -o -iname 'README.html' \\) -print -quit)"
+          readme_file="$(find out -type f \( -iname 'README.md' -o -iname 'README.html' \) -print -quit)"
           if [ -n "$readme_file" ]; then
             echo "README files are not allowed in the published artifact: $readme_file"
             exit 1

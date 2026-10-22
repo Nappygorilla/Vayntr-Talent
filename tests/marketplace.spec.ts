@@ -1,3 +1,4 @@
+import { expect, test } from '@playwright/test'
 
 test('the homepage is the compiled VAYNTR Talent app, not repository documentation', async ({ page }) => {
   await page.goto('/')
@@ -6,7 +7,7 @@ test('the homepage is the compiled VAYNTR Talent app, not repository documentati
   await expect(page.getByRole('heading', { name: /^VAYNTR Talent$/i })).toHaveCount(0)
 })
 
-import { expect, test } from '@playwright/test'
+
 
 test('button arrows rotate right on hover and return when the pointer leaves', async ({ page }) => {
   await page.goto('/')
