@@ -1,12 +1,14 @@
 # VAYNTR Talent
 
-A Vite + React + TypeScript demo for a black-and-red esports and creator talent marketplace. The workspace initially contained only a README stub; this app was created in the workspace as a new Vite project. No GitHub repository connection, production backend, hosted authentication, or persistent database is configured.
+A Next.js App Router + React + TypeScript demo for a black-and-red esports and creator talent marketplace. The UI preserves the existing VAYNTR Talent demo flows and styling. The app can run as a standard Next.js server or export as a static site for GitHub Pages.
 
 ## Run locally
 
+Node.js 22 or newer is recommended.
+
 ```sh
 npm install
-npm run dev -- --host 0.0.0.0
+npm run dev
 ```
 
 Build and checks:
@@ -14,7 +16,14 @@ Build and checks:
 ```sh
 npm run build
 npm run lint
+npm run test:e2e
 ```
+
+## Deployment
+
+- **GitHub Pages demo:** the Actions workflow sets `GITHUB_PAGES=true`, builds a static export into `out/`, and publishes that directory under `/Vayntr-Talent/`.
+- **Server deployment:** omit `GITHUB_PAGES=true`, then use `npm run build` and `npm start` on a Next.js-capable host such as Render.
+- Keep GitHub Pages' publishing source set to **GitHub Actions** for the static export workflow to own deployment.
 
 ## What this demo includes
 

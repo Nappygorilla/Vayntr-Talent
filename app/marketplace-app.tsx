@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import './App.css'
+'use client'
 
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 type Listing = {
   id: string; title: string; org: string; mark: string; category: string; game: string; openings: number
   engagement: string; compensation: string; hours: string; schedule: string; location: string; eligibility: string
