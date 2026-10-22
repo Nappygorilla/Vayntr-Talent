@@ -123,7 +123,7 @@ test('feedback micro-interaction captures a local demo response without claiming
 test('editorial redesign uses open sections instead of placeholder ad blocks and boxed feature cards', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Find your place in the game/i })).toBeVisible()
-  await expect(page.getByLabel('Who VAYNTR Talent is for')).toBeVisible()
+  await expect(page.locator('.discipline-strip')).toBeVisible()
   await expect(page.getByText(/TOP BANNER|LEADERBOARD|SIDEBAR · 300 × 250/)).toHaveCount(0)
   const feature = page.locator('.feature-card').first()
   await expect(feature).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
