@@ -36,3 +36,7 @@ test-results/
 /artifacts/
 /freebuff.wrangler.jsonc
 /freebuff.open-next.config.ts
+
+# Local dev artifacts
+.next-dev.pid
+*.tsbuildinfo

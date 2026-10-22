@@ -1,0 +1,41 @@
+name: Keep the Render backend awake
+
+on:
+  schedule:
+    # Render's free plan idles after ~15 minutes without traffic, so ping every 10.
+    # GitHub's scheduler is best-effort and can start a run several minutes late.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the health endpoint
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${BACKEND_URL}" ]; then
+            echo "::error::Add a BACKEND_URL repository secret (for example https://vayntr-api.onrender.com) before this job can run."
+            exit 1
+          fi
+          url="${BACKEND_URL%/}/health"
+          for attempt in 1 2 3; do
+            code=$(curl --silent --show-error --location --max-time 60 --output /dev/null --write-out '%{http_code}' "$url" || true)
+            echo "Attempt ${attempt}: ${url} -> ${code:-no response}"
+            if [ "$code" = "200" ]; then
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::The backend did not answer 200 at ${url}. A cold start can take ~50s; check the Render service if this keeps failing."
+          exit 1

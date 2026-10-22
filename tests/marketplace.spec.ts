@@ -7,8 +7,6 @@ test('the homepage is the compiled VAYNTR Talent app, not repository documentati
   await expect(page.getByRole('heading', { name: /^VAYNTR Talent$/i })).toHaveCount(0)
 })
 
-
-
 test('button arrows rotate right on hover and return when the pointer leaves', async ({ page }) => {
   await page.goto('/')
   const button = page.getByRole('button', { name: /Explore opportunities/ }).first()
@@ -21,7 +19,6 @@ test('button arrows rotate right on hover and return when the pointer leaves', a
   await page.mouse.move(0, 0)
   await expect(arrow).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)')
 })
-
 
 test('quick navigation opens with Ctrl+K and routes to a searched page', async ({ page }) => {
   await page.goto('/')
@@ -42,73 +39,85 @@ test('quick navigation opens with Ctrl+K and routes to a searched page', async (
   await expect(page.getByRole('heading', { name: /A useful VOD review starts with a question/i })).toBeVisible()
 })
 
-test('candidate marketplace journey and organization demo surfaces', async ({ page }) => {
+test('the marketplace offers both sides of the market', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: /Find your place in the game/i })).toBeVisible()
+  await page.getByRole('button', { name: /I.m a player/i }).click()
+  await expect(page.getByRole('heading', { name: /Players open to offers/i })).toBeVisible()
+  await expect(page.getByRole('tab', { name: /Players looking for an org/i })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tab', { name: /Orgs looking for players/i })).toHaveAttribute('aria-selected', 'false')
 
-  await page.getByRole('button', { name: 'Explore opportunities' }).first().click()
+  await page.getByRole('tab', { name: /Orgs looking for players/i }).click()
   await expect(page.getByRole('heading', { name: /Find your next role/i })).toBeVisible()
-  await expect(page.getByText('5 sample roles')).toBeVisible()
+  await expect(page.getByText('5 open roles')).toBeVisible()
+})
+
+test('applying respects the game age policy on the listing', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: /Explore roles/ }).click()
   await page.getByPlaceholder('Role, organization, or game').fill('editor')
   await expect(page.getByRole('heading', { name: 'Short-form Video Editor' })).toBeVisible()
   await page.getByRole('button', { name: 'View details' }).click()
   await expect(page.getByText('Paid · $25–35 USD / hour')).toBeVisible()
   await expect(page.getByText(/Posted Oct 20, 2026 · Expires Nov 19, 2026/)).toBeVisible()
+
+  // No age saved yet: the apply action is gated.
+  await expect(page.getByRole('button', { name: '16+ required' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Open profile' }).click()
+  await page.getByRole('spinbutton', { name: 'Age' }).fill('20')
+  await page.getByRole('button', { name: 'Save profile' }).click()
+  await expect(page.getByRole('status')).toContainText('Profile saved')
+
+  await page.getByRole('button', { name: /Explore roles/ }).click()
+  await page.getByRole('button', { name: 'View details' }).click()
   await page.getByRole('button', { name: 'Apply through platform' }).click()
-  await expect(page.getByRole('status')).toContainText('no organization was contacted')
+  await expect(page.getByRole('status')).toContainText('Application recorded')
 
   await page.getByRole('button', { name: 'Report listing' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
-  await page.getByRole('button', { name: 'Submit demo report' }).click()
-  await expect(page.getByRole('status')).toContainText('No real moderation queue')
+  await page.getByRole('button', { name: 'Submit report' }).click()
+  await expect(page.getByRole('status')).toContainText('Report received')
 
   await page.getByRole('button', { name: 'Block organization' }).click()
   await expect(page.getByRole('button', { name: 'Unblock organization' })).toBeVisible()
   await page.getByRole('button', { name: 'Unblock organization' }).click()
   await expect(page.getByRole('button', { name: 'Block organization' })).toBeVisible()
-
-  await page.getByRole('button', { name: /Sign in/ }).click()
-  await expect(page.getByRole('heading', { name: /Your path. Your terms./ })).toBeVisible()
-  const visibilitySwitch = page.getByRole('switch', { name: 'Allow candidate discovery' })
-  await expect(visibilitySwitch).toHaveAttribute('aria-checked', 'false')
-  await visibilitySwitch.click()
-  await expect(visibilitySwitch).toHaveAttribute('aria-checked', 'true')
-  await page.getByRole('button', { name: 'Save demo profile' }).click()
-  await expect(page.getByRole('status')).toContainText('page memory only')
-
-  await page.getByRole('button', { name: /Explore roles/ }).click()
-  await page.getByRole('button', { name: 'View details' }).click()
-  await page.getByRole('button', { name: 'Applied in demo' }).waitFor().catch(async () => {
-    await page.getByRole('button', { name: 'Apply through platform' }).click()
-  })
-  await page.getByRole('button', { name: /Sign in/ }).click()
-  await page.getByRole('button', { name: /Explore roles/ }).click()
-  await page.getByRole('button', { name: 'Applications' }).click()
-  await expect(page.getByText('Short-form Video Editor', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Withdraw' }).last().click()
-  await expect(page.getByRole('status')).toContainText('withdrawn locally')
-
-  await page.getByRole('button', { name: 'For organizations' }).click()
-  await expect(page.getByText(/Real organization scoping, authentication and audit logs are not configured/)).toBeVisible()
-  await expect(page.getByText(/No verification has been performed/)).toBeVisible()
 })
 
-test('search, category filter, resources, and moderation disclosure', async ({ page }) => {
+test('a player can message an organization from a role', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: /Explore roles/ }).click()
-  await page.getByLabel('Filter by role category').selectOption('Analyst')
-  await expect(page.getByRole('heading', { name: 'Rocket League Analyst' })).toBeVisible()
-  await expect(page.getByText('1 sample roles')).toBeVisible()
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Resources' }).click()
-  await expect(page.getByRole('heading', { name: /A useful VOD review starts with a question/i })).toBeVisible()
-  await expect(page.getByText(/REVIEWED OCTOBER 22, 2026/)).toBeVisible()
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Trust & safety' }).click()
-  await page.getByRole('button', { name: /Moderator review dashboard/ }).click()
-  await expect(page.getByText(/This non-authenticated mockup/)).toBeVisible()
+  await page.getByRole('button', { name: 'View details' }).first().click()
+  await page.getByRole('button', { name: 'Message organization' }).click()
+
+  await expect(page.getByRole('heading', { name: /Talk it/i })).toBeVisible()
+  await expect(page.getByRole('log')).toBeVisible()
+  await page.getByRole('textbox', { name: 'Message' }).fill('Could we talk about the trial dates?')
+  await page.getByRole('button', { name: /^Send/ }).click()
+  await expect(page.getByRole('log')).toContainText('trial dates')
 })
 
+test('orgs can find players and message them in the workspace inbox', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: /I.m a player/i }).click()
 
-test('feedback micro-interaction captures a local demo response without claiming it was sent', async ({ page }) => {
+  const mika = page.locator('.player-card').filter({ hasText: 'Mika Sato' })
+  const warzone = page.locator('.player-card').filter({ hasText: 'Dante Cruz' })
+  // Rocket League allows 13+, so a 14-year-old can be signed; Warzone requires 18+.
+  await expect(mika.getByRole('button', { name: 'Message player' })).toBeEnabled()
+  await expect(warzone.getByRole('button', { name: 'Message player' })).toBeDisabled()
+  await expect(warzone.getByText(/Below the Call of Duty/i)).toBeVisible()
+
+  await mika.getByRole('button', { name: 'Message player' }).click()
+  await expect(page.getByRole('heading', { name: /Build your team/i })).toBeVisible()
+  await expect(page.locator('.thread-peer')).toContainText('Mika Sato')
+  await page.getByRole('textbox', { name: 'Message' }).fill('Can your guardian join a call on Thursday?')
+  await page.getByRole('button', { name: /^Send/ }).click()
+  await expect(page.getByRole('log')).toContainText('guardian join a call')
+
+  await expect(page.getByRole('button', { name: /Inbox/ })).toBeVisible()
+})
+
+test('feedback shows an in-place confirmation after submitting', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Open feedback panel' }).click()
   const panel = page.getByRole('dialog', { name: 'Help us improve.' })
@@ -118,10 +127,18 @@ test('feedback micro-interaction captures a local demo response without claiming
   await expect(idea).toHaveAttribute('aria-pressed', 'true')
   await panel.getByRole('textbox', { name: 'Optional details' }).fill('Add a way to preview creator profiles.')
   await panel.getByRole('button', { name: /Submit feedback/ }).click()
-  await expect(panel).not.toBeVisible()
-  await expect(page.getByRole('status')).toContainText('did not send or save your response')
+  await expect(panel.getByRole('heading', { name: /Got it/i })).toBeVisible()
+  await expect(page.getByRole('status')).toContainText('Feedback received')
 })
 
+test('age guidance covers every supported game', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: /Trust & safety|Trust &amp; safety/ }).first().click()
+  await expect(page.getByRole('heading', { name: /Every scene sets/i })).toBeVisible()
+  await expect(page.locator('.age-row')).toHaveCount(12)
+  await expect(page.locator('.age-row').filter({ hasText: 'Rocket League' })).toContainText('13+')
+  await expect(page.locator('.age-row').filter({ hasText: 'Call of Duty' })).toContainText('18+')
+})
 
 test('home page uses the redesigned surfaces instead of placeholder ad blocks', async ({ page }) => {
   await page.goto('/')
@@ -130,6 +147,7 @@ test('home page uses the redesigned surfaces instead of placeholder ad blocks', 
   await expect(page.getByText(/TOP BANNER|LEADERBOARD|SIDEBAR · 300 × 250/)).toHaveCount(0)
   await expect(page.locator('.hero-visual .float-card')).toHaveCount(2)
   await expect(page.locator('.home-role')).toHaveCount(3)
+  await expect(page.locator('.path-card')).toHaveCount(2)
   const feature = page.locator('.feature-card').first()
   await expect(feature).toHaveCSS('border-radius', '20px')
   await expect(feature).toHaveCSS('border-top-width', '1px')
