@@ -160,3 +160,100 @@ test('home page uses the redesigned surfaces and only previews real roles', asyn
   await expect(page.locator('.empty-state')).toBeVisible()
   await expect(page.locator('.empty-state')).toHaveCSS('border-radius', '20px')
 })
+
+test('anyone 13 or older can create a free player account with guardian consent', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Create free account' }).click()
+  await expect(page.getByRole('heading', { name: /Create a free account/i })).toBeVisible()
+
+  // No account type chosen yet: the flow does not advance.
+  await page.getByRole('button', { name: /^Continue/ }).click()
+  await expect(page.locator('.field-error')).toContainText('Choose player, content creator, or esports organization')
+
+  await page.locator('.role-choices').getByRole('button', { name: /^Player/ }).click()
+  await page.getByRole('button', { name: /^Continue/ }).click()
+  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
+
+  await page.getByPlaceholder('e.g. the name you compete under').fill('Test Player')
+  await page.getByPlaceholder('you@example.com').fill('player@example.com')
+  await page.getByPlaceholder('At least 8 characters').fill('a-long-password')
+  await page.locator('label.form-field').filter({ hasText: /^State/ }).locator('select').selectOption('California')
+  await page.locator('input[type="number"]').fill('14')
+  await page.getByRole('button', { name: /^Continue/ }).click()
+  // A minor cannot get past this step without a guardian email.
+  await expect(page.locator('.field-error')).toContainText('parent or guardian email')
+
+  await page.getByPlaceholder('guardian@example.com').fill('guardian@example.com')
+  await page.getByRole('button', { name: /^Continue/ }).click()
+  await expect(page.getByRole('heading', { name: 'Your game' })).toBeVisible()
+  await page.locator('label.form-field').filter({ hasText: 'Primary game' }).locator('select').selectOption('Rocket League')
+  await page.getByRole('button', { name: /^Continue/ }).click()
+
+  // Consent cannot be skipped, and marketing is opt-in.
+  await expect(page.getByRole('heading', { name: 'Privacy & consent' })).toBeVisible()
+  await page.locator('.signup-actions').getByRole('button', { name: /Create free account/ }).click()
+  await expect(page.locator('.field-error')).toContainText('privacy notice and safety rules')
+  const marketing = page.locator('.consent-list label').filter({ hasText: 'product updates' }).locator('input')
+  await expect(marketing).not.toBeChecked()
+  await page.locator('.consent-list label').filter({ hasText: 'privacy notice and the safety rules' }).locator('input').check()
+  await page.locator('.consent-list label').filter({ hasText: 'parent or guardian has read' }).locator('input').check()
+
+  await page.locator('.signup-actions').getByRole('button', { name: /Create free account/ }).click()
+  await expect(page.getByRole('heading', { name: /Welcome,/ })).toBeVisible()
+  await expect(page.getByText('Guardian confirmation pending')).toBeVisible()
+  await expect(page.locator('.account-chip')).toContainText('Test Player')
+
+  await page.getByRole('button', { name: /Open my profile/ }).click()
+  await expect(page.getByRole('spinbutton', { name: 'Age' })).toHaveValue('14')
+})
+
+test('children under 13 cannot create an account', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Create free account' }).click()
+  await page.locator('.role-choices').getByRole('button', { name: /^Content creator/ }).click()
+  await page.getByRole('button', { name: /^Continue/ }).click()
+  await page.getByPlaceholder('e.g. the name you compete under').fill('Too Young')
+  await page.getByPlaceholder('you@example.com').fill('kid@example.com')
+  await page.getByPlaceholder('At least 8 characters').fill('a-long-password')
+  await page.locator('label.form-field').filter({ hasText: /^State/ }).locator('select').selectOption('Texas')
+  await page.locator('input[type="number"]').fill('12')
+  await page.getByRole('button', { name: /^Continue/ }).click()
+  await expect(page.locator('.field-error')).toContainText('cannot create accounts for children under 13')
+  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
+})
+
+test('an organization signs up free and gets its own workspace', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Create free account' }).click()
+  await page.locator('.role-choices').getByRole('button', { name: /^Esports organization/ }).click()
+  await page.getByRole('button', { name: /^Continue/ }).click()
+  await page.getByPlaceholder('e.g. your team or studio name').fill('Harbor Nine')
+  await page.getByPlaceholder('you@example.com').fill('team@example.com')
+  await page.getByPlaceholder('At least 8 characters').fill('a-long-password')
+  await page.locator('label.form-field').filter({ hasText: /^State/ }).locator('select').selectOption('New York')
+  await page.locator('input[type="number"]').fill('30')
+  await page.getByRole('button', { name: /^Continue/ }).click()
+  await expect(page.getByRole('heading', { name: 'Your organization' })).toBeVisible()
+  await page.locator('label.form-field').filter({ hasText: 'Organization type' }).locator('select').selectOption('Esports team')
+  await page.getByRole('button', { name: /^Continue/ }).click()
+  await page.locator('.consent-list label').filter({ hasText: 'privacy notice and the safety rules' }).locator('input').check()
+  await page.locator('.signup-actions').getByRole('button', { name: /Create free account/ }).click()
+  await expect(page.getByText('Active on this device')).toBeVisible()
+
+  await page.getByRole('button', { name: /Open the organization workspace/ }).click()
+  await expect(page.getByRole('heading', { name: 'Build your team.' })).toBeVisible()
+  await expect(page.locator('.dashboard-head')).toContainText('Harbor Nine')
+  await expect(page.getByRole('heading', { name: 'No listings or applications yet' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No organization account yet' })).toHaveCount(0)
+})
+
+test('the privacy notice lists US rights and the no-sale position', async ({ page }) => {
+  await page.goto('/')
+  await page.locator('footer').getByRole('button', { name: 'Privacy', exact: true }).click()
+  await expect(page.getByRole('heading', { name: /Your data/ })).toBeVisible()
+  await expect(page.getByText('Draft notice.')).toBeVisible()
+  await expect(page.getByText(/CCPA\/CPRA/)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No sale, no ad tracking' })).toBeVisible()
+  await expect(page.getByText(/COPPA/).first()).toBeVisible()
+  await expect(page.locator('.rights-list li')).toHaveCount(8)
+})

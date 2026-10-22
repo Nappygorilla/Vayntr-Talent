@@ -30,8 +30,10 @@ npm run test:e2e
 - Responsive public landing, role marketplace with search/category filters, listing detail, organization directory, player directory, messages, trust and safety page, and dated educational resources with source links.
 - Two-sided marketplace: **players looking for an org** and **orgs looking for players**, each gated by that game's own competition age floor. Salary is stated on both sides — a player's ask and the organization's offer with its pay terms.
 - **No invented records.** Organizations, roles, players and conversations are typed empty stores in the client until the API fills them. Empty states say plainly that nothing is loaded on this device instead of showing sample people or companies.
+- **Free signup for everyone 13 and older**, with no invitation, approval queue or payment. A four-step flow asks first whether you are a player, a content creator or an esports organization, then account details, role-specific questions, and a consent step. Accounts exist on the device only until the API lands.
 - Candidate profile form with private-by-default visibility toggle, per-application sharing summary, and sensitive-data warnings. Saves stay in page memory and reset on reload.
-- Organization workspace requires a real organization account; without one it says so instead of rendering a mock dashboard.
+- Organization workspace requires a real organization account; a signed-in organization gets its own workspace header, and without one the page says so instead of rendering a mock dashboard.
+- A US privacy notice covering what is collected, the no-sale/no-tracking position, retention, minors, and the access, correction, deletion, opt-out, limited-use, non-discrimination, authorized-agent and appeal rights of CCPA/CPRA and other state laws.
 - Report dialog, feedback panel and moderator queue exist as UI. Their copy states that a report or note is saved on this device — it does not claim to have reached moderators or the product team.
 - Reserved future ad inventory. **No ad network, ad scripts, tracking, sponsored placements, or ad targeting are installed.** Keep ads out of applications, private profiles, candidate data, and audience targeting. Establish audience age policy, consent and privacy reviews before any future advertising.
 - Responsive semantic controls, labels, keyboard focus treatment, reduced-motion support, and empty states.
@@ -45,7 +47,9 @@ This is a **front-end-only build**, not a live or launch-ready recruitment marke
 - No real organization or individual has been verified. A future verification label must state exact checks and dates; neither org nor identity verification guarantees role safety, legitimacy, or VAYNTR endorsement.
 - **No support address is wired.** The "Contact support" control opens the feedback panel until a monitored support owner and escalation process are assigned.
 - There are no real listings, testimonials, endorsements, users, or performance claims. Educational guidance is cautiously framed, reviewed October 22, 2026, and linked to its sources. Platform-specific guidance may change; re-review sources before launch.
-- Age is a **launch decision**. Floor ages follow each scene's published competition rules (Rocket League, Fortnite and Street Fighter 13+; Apex, CS2 and EA SPORTS FC 16+; League of Legends and Overwatch 17+; VALORANT, Warzone, Rainbow Six and Tekken 18+), and a stored age gates applying and contacting. An age input is not robust age assurance. Do not allow minors to create marketplace accounts/apply until a separate guardian-involved process, contact protections, limited visibility, and legal/privacy review are implemented. Do not collect personal data through the marketplace from children under 13.
+- Age is a **launch decision**. Floor ages follow each scene's published competition rules (Rocket League, Fortnite and Street Fighter 13+; Apex, CS2 and EA SPORTS FC 16+; League of Legends and Overwatch 17+; VALORANT, Warzone, Rainbow Six and Tekken 18+), and a stored age gates applying and contacting. An age input is not robust age assurance.
+- **Signup enforces a 13+ minimum** and refuses under-13 accounts, which is what COPPA requires without verifiable parental consent; organization accounts require an adult 18 or older. Ages 13–17 must supply a guardian email and a guardian consent checkbox, and their account is marked “guardian confirmation pending”. **No guardian email is sent yet**, so a production release needs verifiable parental or guardian consent delivery, contact protections, limited visibility and counsel review before minors can be onboarded at scale.
+- Signup itself is not persistent: there is no server, so the password is checked and discarded (never stored in the browser), and the account resets on reload.
 - Candidate discovery is off by default in the demo, but the form toggle is not a privacy boundary. A production system must only expose opted-in profiles to authenticated/approved organizations and let candidates turn discovery off promptly.
 - Future listing forms must enforce all role, compensation, hours, location, eligibility, experience, responsibilities, application process, posting and expiry fields; prohibit fees, required purchases, misleading compensation and requests for credentials/sensitive documents. Applications must be initiated by the candidate and communicate through a controlled platform flow.
 
@@ -58,13 +62,15 @@ Implement per-application disclosure, controlled communications, block/report/mo
 ## Launch gates (not passed)
 
 1. Approve and document age scope, terms, privacy notice, prohibited conduct, support/escalation and moderation ownership.
-2. Add authorization tests proving candidates cannot read another candidate's records and recruiters cannot read another organization's data.
-3. Prove private content never appears in public HTML, search indexes, analytics, logs or ad systems.
-4. Implement and test report, block, moderation, removal, appeal and support flows.
-5. Define verification criteria, compensation disclosures, expiry and scam response.
-6. Implement/test account export, deletion and record retention.
-7. Keep candidate fees/pay-to-apply absent and label any future sponsored roles.
-8. Test keyboard, screen-reader, mobile and accessibility for recruitment/application flows.
-9. Run a limited pilot reviewed by candidates and organizations before broad rollout.
+2. Assign a monitored privacy contact and a request-handling process for access, correction, deletion, opt-out and appeal requests, and have counsel review the draft privacy notice.
+3. Deliver real guardian confirmation by email before any under-18 account is activated.
+4. Add authorization tests proving candidates cannot read another candidate's records and recruiters cannot read another organization's data.
+5. Prove private content never appears in public HTML, search indexes, analytics, logs or ad systems.
+6. Implement and test report, block, moderation, removal, appeal and support flows.
+7. Define verification criteria, compensation disclosures, expiry and scam response.
+8. Implement/test account export, deletion and record retention.
+9. Keep candidate fees/pay-to-apply absent and label any future sponsored roles.
+10. Test keyboard, screen-reader, mobile and accessibility for recruitment/application flows.
+11. Run a limited pilot reviewed by candidates and organizations before broad rollout.
 
 Do not describe this build as a real marketplace or publicly launch it until these gates and the relevant legal/security reviews are complete.
